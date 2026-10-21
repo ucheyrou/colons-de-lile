@@ -73,6 +73,11 @@ Capacités de l'artefact retenues : `room` (messages en direct, une salle par pa
 - Les téléphones doivent avoir accès à l'artefact (invités ou membres) avec le droit « contributeur », sinon ils ne peuvent pas émettre sur le sujet `a`.
 - Le plateau est reconstruit sur chaque téléphone à partir de la graine (`E.boardFromSeed`) : jamais envoyé.
 
+## 6 ter. Hébergement et canal hors artefact
+- Site statique gratuit sur GitHub Pages (`docs/`). Aucun serveur à payer ni compte joueur.
+- Canal : courtiers MQTT publics (EMQX, HiveMQ, Mosquitto) via WebSocket ; un message perdu est rattrapé par une resynchronisation périodique de l'hôte et une relance du téléphone. Latence mesurée : environ 0,2 à 0,5 s par action.
+- Le courtier est public : tout est chiffré de bout en bout, mais n'importe qui connaissant un code de salle (4 caractères) peut rejoindre le salon avant le lancement. Une fois la partie lancée, seuls les sièges attribués jouent.
+
 ## 7. Ce qui est volontairement hors périmètre V1
 
 Extensions (Marins, Villes & Chevaliers), plateau personnalisé, parties à plus de 4 joueurs, spectateurs, classements en ligne.

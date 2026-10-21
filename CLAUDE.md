@@ -13,6 +13,7 @@ Jeu de plateau en ligne (inspiré des règles de base de Catan). Plateau sur ord
 ## Architecture (ne pas casser)
 ```
 src/engine.js      Règles. Pur, sans DOM, sans date, sans Math.random. Testable sous Node.
+src/mqtt-room.js   Salon MQTT public (WebSocket) avec l'interface de `room`, pour le site hors artefact.
 src/net.js         Transport écran <-> téléphones (chiffrement ECDH/AES-GCM, découpage, resynchronisation). Sans DOM ni règles.
 src/ui.js          Interface, 3 modes (local, host, client). Aucune règle : appelle E.available / E.legal* / E.apply.
 src/art.svg        Scènes illustrées des tuiles et motifs (injectées dans le template).
@@ -34,9 +35,18 @@ Règles d'or :
 node --test test/*.test.mjs           # tests moteur
 node build.mjs               # génère dist/index.html
 node test/simulate.mjs 200   # 200 parties aléatoires, vérifie les invariants
-node test/e2e.mjs            # écran + 3 téléphones en jsdom (jsdom requis : npm i --no-save jsdom)
+node test/e2e.mjs            # écran + 3 téléphones en jsdom (jsdom requis : npm i --no-save jsdom) ; ajouter --site pour un vrai courtier
+node test/mqtt-live.mjs      # client MQTT contre les courtiers publics (réseau)
+node test/net-live.mjs       # hôte + 2 téléphones chiffrés par Internet
 ```
 Ne publie l'artefact qu'après `node --test` et `node build.mjs` verts.
+
+## Déploiement du site (GitHub Pages, gratuit)
+- Site : https://ucheyrou.github.io/colons-de-lile/ (dépôt public `ucheyrou/colons-de-lile`, Pages sur `main` dossier `/docs`).
+- Mise à jour : `node build.mjs`, puis commit de `docs/` et `git push`. Le site se reconstruit en une minute.
+- Les commits utilisent l'e-mail noreply GitHub (jamais l'adresse d'école de la config globale).
+- Sur le site, les téléphones passent par un courtier MQTT public (`src/mqtt-room.js`, courtiers en repli dans l'ordre). Le QR code ouvre `site#j=CODE` : code déjà rempli.
+- Le canal est choisi automatiquement : capacité `room` si on est dans un artefact, MQTT sinon. Les deux mondes ne communiquent pas entre eux.
 
 ## Publication (artefact)
 - Publier `dist/index.html` avec l'outil Artifact, même chemin à chaque fois pour garder le même lien, avec `capabilities: {room: {topics: {a: "interact"}}}`.

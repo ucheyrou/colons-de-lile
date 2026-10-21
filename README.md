@@ -6,6 +6,8 @@ Aucun compte, aucun serveur à payer : une page statique et un courtier MQTT pub
 
 ## Jouer
 
+Site : https://ucheyrou.github.io/colons-de-lile/
+
 1. Ouvre le site sur l'ordinateur et choisis « Plateau sur cet écran ».
 2. Les joueurs scannent le QR code avec leur téléphone, entrent leur prénom, et c'est parti.
 3. Sans téléphones : « Un seul écran pour tous ».
