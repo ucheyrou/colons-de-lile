@@ -1,0 +1,2692 @@
+<title>Colons de l'Île</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@500;600;700&display=swap">
+<style>
+/* Disposition : plateau à gauche (sticky), colonne de jeu à droite ; sur mobile la main passe avant le plateau. */
+:root {
+  --bg: #e9eff1;
+  --surface: #ffffff;
+  --surface-2: #f1f6f7;
+  --ink: #14232b;
+  --muted: #566972;
+  --line: #cdd8dc;
+  --accent: #0e6b7b;
+  --accent-ink: #ffffff;
+  --accent-soft: #d6eaee;
+  --sea: #b9d6dd;
+  --sea-edge: #93bcc6;
+  --pier: #6b5a43;
+  --good: #2e8b57;
+  --warn: #b87100;
+  --bad: #c2402d;
+  --shadow: 0 1px 2px rgba(10, 30, 40, .08), 0 8px 22px rgba(10, 30, 40, .08);
+  --p-red: #d64532;
+  --p-blue: #2f78c4;
+  --p-orange: #e8932c;
+  --p-white: #f3efe6;
+  --f-display: 'Bricolage Grotesque', 'Avenir Next', system-ui, sans-serif;
+  --f-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c171c;
+    --surface: #14252c;
+    --surface-2: #1a2f37;
+    --ink: #e7f0f2;
+    --muted: #93a9b1;
+    --line: #27404a;
+    --accent: #58c4d6;
+    --accent-ink: #06222a;
+    --accent-soft: #17414b;
+    --sea: #10303a;
+    --sea-edge: #1f4a58;
+    --pier: #a89272;
+    --good: #5fc58a;
+    --warn: #e0a23a;
+    --bad: #ee7a68;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 22px rgba(0, 0, 0, .35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c171c;
+  --surface: #14252c;
+  --surface-2: #1a2f37;
+  --ink: #e7f0f2;
+  --muted: #93a9b1;
+  --line: #27404a;
+  --accent: #58c4d6;
+  --accent-ink: #06222a;
+  --accent-soft: #17414b;
+  --sea: #10303a;
+  --sea-edge: #1f4a58;
+  --pier: #a89272;
+  --good: #5fc58a;
+  --warn: #e0a23a;
+  --bad: #ee7a68;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 22px rgba(0, 0, 0, .35);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.4;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px 28px;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---------- En-tête ---------- */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.brand h1 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
+.brand span { color: var(--muted); font-size: 13px; }
+.top-actions { display: flex; gap: 8px; }
+
+/* ---------- Boutons ---------- */
+.btn {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-weight: 650;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform .08s ease, background .15s ease;
+}
+.btn:hover:not(:disabled) { background: var(--surface-2); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .45; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
+.btn.big { min-height: 56px; font-size: 18px; width: 100%; }
+.btn.small { min-height: 36px; padding: 0 12px; font-size: 14px; }
+.btn.danger { color: var(--bad); }
+
+/* ---------- Disposition ---------- */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 410px; gap: 16px; align-items: start; }
+.stage { position: sticky; top: 8px; }
+.side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+@media (max-width: 920px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .stage { position: static; order: 3; }
+  .side { display: contents; }
+  .hand { order: 1; }
+  .scores { order: 2; }
+  .log { order: 4; }
+  .brand span { display: none; }
+}
+
+/* ---------- Plateau ---------- */
+.stage-card { position: relative; overflow: hidden; background: var(--sea); border-radius: 18px; border: 1px solid var(--sea-edge); }
+#board { display: block; width: 100%; height: auto; max-height: calc(100vh - 90px); }
+@media (max-width: 920px) { #board { max-height: none; } }
+.banner {
+  position: absolute; left: 12px; right: 12px; top: 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  pointer-events: none;
+}
+.banner > * { pointer-events: auto; }
+.say {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow);
+  padding: 7px 14px 7px 10px; display: inline-flex; align-items: center; gap: 8px; font-weight: 650; max-width: 100%;
+}
+.dice { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; box-shadow: var(--shadow); }
+.die {
+  width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center;
+  background: #fffdf8; color: #1b1b1b; border: 1px solid #1b1b1b33; font: 800 18px var(--f-display);
+}
+.dice .sum { font: 800 20px var(--f-display); min-width: 28px; text-align: center; font-variant-numeric: tabular-nums; }
+.dice.rolled .die { animation: tumble .45s ease-out; }
+@keyframes tumble { 0% { transform: rotate(-80deg) scale(.6); } 60% { transform: rotate(14deg) scale(1.1); } 100% { transform: none; } }
+
+.tgt { fill: var(--accent); fill-opacity: .35; stroke: #fff; stroke-width: 4; cursor: pointer; animation: pulse 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.tgt-e { stroke: #fff; stroke-opacity: .85; stroke-width: 18; stroke-linecap: round; cursor: pointer; animation: glow 1.4s ease-in-out infinite; }
+.tgt-h { fill: #000; fill-opacity: 0; cursor: pointer; }
+.tgt-h:hover { fill-opacity: .22; }
+.tgt-h-ring { fill: none; stroke: #fff; stroke-width: 6; stroke-dasharray: 14 10; pointer-events: none; }
+@keyframes pulse { 50% { transform: scale(1.25); fill-opacity: .6; } }
+@keyframes glow { 50% { stroke-opacity: .4; } }
+@media (prefers-reduced-motion: reduce) { .tgt, .tgt-e, .dice.rolled .die { animation: none; } }
+.piece { stroke: #1b1b1b; stroke-width: 2.4; stroke-linejoin: round; }
+
+/* ---------- Joueurs et scores ---------- */
+.scores { padding: 12px; }
+.scores h2, .log h2, .hand h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.players { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.pl {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 2px 10px; align-items: center;
+  padding: 8px 10px; border-radius: 10px; border: 1px solid transparent; background: var(--surface-2);
+  --pc: var(--p-red);
+}
+.pl.turn { border-color: var(--pc); background: var(--surface); box-shadow: inset 4px 0 0 var(--pc); }
+.dot { width: 14px; height: 14px; border-radius: 50%; background: var(--pc); border: 2px solid #1b1b1b; flex: none; }
+.pl b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl .pts { font: 800 22px var(--f-display); font-variant-numeric: tabular-nums; }
+.pl .meta { grid-column: 2 / 4; display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.badge { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--ink); }
+.bank { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; color: var(--muted); font-size: 13px; }
+.bank span { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+
+/* ---------- Main du joueur (vue téléphone) ---------- */
+.hand { padding: 14px; display: flex; flex-direction: column; gap: 12px; --pc: var(--p-red); }
+.hand-head { display: flex; align-items: center; gap: 10px; }
+.hand-head h2 { color: var(--ink); text-transform: none; letter-spacing: 0; font-size: 20px; font-weight: 800; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hand-head .vp { font: 800 22px var(--f-display); }
+.hand-head .vp small { font: 600 12px var(--f-body); color: var(--muted); margin-left: 3px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  min-height: 34px; padding: 0 12px 0 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2);
+  display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; position: relative;
+}
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.chip .alert { position: absolute; top: -4px; right: -3px; width: 12px; height: 12px; border-radius: 50%; background: var(--warn); border: 2px solid var(--surface); }
+.hint { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft); font-weight: 600; }
+.hint.go { background: var(--accent); color: var(--accent-ink); }
+.tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.tile {
+  border: 1px solid var(--line); border-radius: 12px; padding: 8px 2px 6px; text-align: center; background: var(--surface-2);
+  display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0;
+}
+.tile .ico { width: 34px; height: 34px; }
+.tile b { font: 800 24px var(--f-display); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tile span { font-size: 11px; color: var(--muted); font-weight: 600; }
+.tile.zero { opacity: .5; }
+.ico { width: 28px; height: 28px; flex: none; }
+.mini { width: 16px; height: 16px; flex: none; }
+.section-title { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin: 2px 0 -4px; }
+.devs { display: grid; gap: 6px; }
+.dev { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.dev .nm { flex: 1; min-width: 0; font-weight: 650; }
+.dev .nm small { display: block; color: var(--muted); font-weight: 500; font-size: 12px; }
+.dev .cnt { font: 800 16px var(--f-display); min-width: 22px; text-align: center; }
+.builds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.build { text-align: left; flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 12px; min-height: 56px; }
+.build .cost { display: flex; gap: 1px; flex-wrap: wrap; min-height: 16px; }
+.build[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row > * { flex: 1; }
+.sheet { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--surface-2); display: grid; gap: 10px; }
+.tabs { display: flex; gap: 6px; }
+.tabs .btn { flex: 1; min-height: 38px; }
+.tabs .btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.picks { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.pick {
+  min-height: 62px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: 650; padding: 4px 0;
+}
+.pick small { color: var(--muted); font-weight: 600; font-size: 11px; font-variant-numeric: tabular-nums; }
+.pick[aria-pressed="true"] { outline: 3px solid var(--accent); outline-offset: -1px; background: var(--accent-soft); }
+.pick:disabled { opacity: .35; }
+.stepper-grid { display: grid; gap: 6px; }
+.stepper { display: grid; grid-template-columns: auto 1fr auto auto auto; align-items: center; gap: 8px; }
+.stepper .nm { font-weight: 600; }
+.stepper b { min-width: 24px; text-align: center; font: 800 18px var(--f-display); font-variant-numeric: tabular-nums; }
+.stepper .btn { min-height: 36px; min-width: 40px; padding: 0; font-size: 20px; }
+.offer { display: grid; gap: 8px; padding: 12px; border-radius: 12px; border: 2px solid var(--warn); background: var(--surface); }
+.offer .line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 650; }
+.bundle { display: inline-flex; align-items: center; gap: 2px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; font-weight: 800; }
+.resp { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.resp .st { font-size: 13px; color: var(--muted); }
+.resp .st.yes { color: var(--good); font-weight: 700; }
+.resp .st.no { color: var(--bad); font-weight: 700; }
+.toast { position: sticky; bottom: 8px; padding: 10px 12px; border-radius: 10px; background: var(--bad); color: #fff; font-weight: 650; }
+
+/* ---------- Journal ---------- */
+.log { padding: 12px; }
+.log ol { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow-y: auto; display: flex; flex-direction: column-reverse; gap: 3px; font-size: 13px; color: var(--muted); }
+.log li:last-child { color: var(--ink); font-weight: 600; }
+
+/* ---------- Accueil et fin de partie ---------- */
+.welcome { max-width: 560px; margin: 4vh auto 0; padding: 22px; display: grid; gap: 16px; }
+.welcome h2 { font-size: 30px; font-weight: 800; letter-spacing: -.02em; }
+.welcome p { margin: 0; color: var(--muted); }
+.seg { display: flex; gap: 6px; }
+.seg .btn { flex: 1; }
+.seg .btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.names { display: grid; gap: 8px; }
+.name-row { display: flex; align-items: center; gap: 10px; --pc: var(--p-red); }
+.name-row input {
+  flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--ink); font: inherit;
+}
+.over {
+  position: absolute; inset: 0; background: rgba(8, 20, 26, .72); display: grid; place-items: center; padding: 16px; z-index: 5;
+}
+.over .card { padding: 22px; max-width: 420px; width: 100%; display: grid; gap: 14px; text-align: center; }
+.over h2 { font-size: 28px; font-weight: 800; }
+.over ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; text-align: left; }
+.over li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--surface-2); border-radius: 10px; }
+.over li b { flex: 1; }
+.confirm { display: grid; gap: 8px; padding: 12px; border-radius: 12px; border: 1px solid var(--bad); background: var(--surface); }
+
+/* ---------- Accueil : modes, salon, jonction ---------- */
+.modes { display: grid; gap: 10px; }
+.mode-card {
+  text-align: left; display: grid; gap: 2px; padding: 14px 16px; min-height: 64px; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--surface-2);
+}
+.mode-card b { font: 800 18px var(--f-display); }
+.mode-card span { color: var(--muted); font-size: 14px; }
+.mode-card:hover { border-color: var(--accent); background: var(--surface); }
+.mode-card.resume { border-color: var(--accent); background: var(--accent-soft); }
+.back { justify-self: start; }
+.field { display: grid; gap: 6px; }
+.field input, .code-input {
+  min-height: 48px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2);
+  color: var(--ink); font: inherit; font-size: 17px; width: 100%;
+}
+.code-input { font: 800 28px var(--f-display); letter-spacing: .3em; text-transform: uppercase; text-align: center; }
+.hint.err { background: color-mix(in srgb, var(--bad) 18%, var(--surface)); color: var(--ink); border: 1px solid var(--bad); }
+.lobby { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.codebox { display: grid; gap: 4px; flex: 1; min-width: 150px; }
+.code { font: 800 56px/1 var(--f-display); letter-spacing: .14em; }
+.qr { width: 150px; height: 150px; background: #fff; border-radius: 10px; padding: 4px; flex: none; }
+.qr svg { display: block; width: 100%; height: 100%; }
+.steps { margin: 0; padding-left: 20px; display: grid; gap: 4px; color: var(--muted); font-size: 14px; }
+.steps b { color: var(--ink); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; overflow-wrap: anywhere; color: var(--ink); }
+.note { margin: 0; color: var(--muted); font-size: 13px; }
+.pl.empty { grid-template-columns: 1fr; color: var(--muted); }
+.badge.off { background: color-mix(in srgb, var(--warn) 30%, var(--surface)); }
+.sending { font: 800 22px var(--f-display); color: var(--muted); animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .2; } }
+@media (prefers-reduced-motion: reduce) { .sending { animation: none; } }
+.conn { font-size: 13px; font-weight: 700; color: var(--warn); display: inline-flex; align-items: center; gap: 6px; }
+.conn::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.conn.on { color: var(--good); }
+
+/* ---------- Écran du plateau (hôte) : plateau au maximum, pas de main ---------- */
+.layout.host { grid-template-columns: minmax(0, 1fr) 360px; }
+.layout.host .hand { display: none; }
+.layout.host .say { font-size: 18px; padding: 10px 18px 10px 12px; }
+.layout.host .die { width: 40px; height: 40px; font-size: 22px; }
+.layout.host .dice .sum { font-size: 26px; }
+.layout.host .log ol { max-height: 360px; }
+
+/* ---------- Téléphone : un onglet à la fois, barre de navigation en bas ---------- */
+body.is-client .brand span { display: none; }
+body.is-client { padding-bottom: 84px; }
+.layout.client { grid-template-columns: minmax(0, 560px); justify-content: center; }
+.layout.client .stage, .layout.client .scores, .layout.client .log, .layout.client .hand { display: none; }
+.layout.client .side { display: flex; }
+.layout.client[data-tab="hand"] .hand { display: flex; }
+.layout.client[data-tab="board"] .stage { display: block; position: static; order: 0; }
+.layout.client[data-tab="info"] .scores, .layout.client[data-tab="info"] .log { display: block; }
+.layout.client .banner { position: static; padding: 8px; background: var(--sea); }
+.layout.client #board { max-height: none; }
+.layout.client .stage-card { display: flex; flex-direction: column; }
+.nav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; gap: 6px;
+  padding: 8px max(12px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+  background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -6px 20px rgba(10, 30, 40, .12);
+}
+.nav-btn {
+  flex: 1; min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); font-weight: 700; position: relative;
+}
+.nav-btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.nav-btn .alert { position: absolute; top: 6px; right: 10px; width: 11px; height: 11px; border-radius: 50%; background: var(--warn); border: 2px solid var(--surface); }
+body.is-client .brand h1 { font-size: 19px; white-space: nowrap; }
+body.is-client .top { margin-bottom: 8px; }
+
+</style>
+
+<!-- Pictogrammes des ressources : un disque teinté et un signe clair, lisibles sur toute couleur. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- Scènes des tuiles : hexagone de rayon 100 centré sur l'origine. Chaque scène est rognée par #hexclip. -->
+<clipPath id="hexclip"><polygon points="86.6,-50 86.6,50 0,100 -86.6,50 -86.6,-50 0,-100"/></clipPath>
+
+<linearGradient id="gr-forest" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5fa064"/><stop offset="1" stop-color="#3b7a49"/></linearGradient>
+<linearGradient id="gr-pasture" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c4e690"/><stop offset="1" stop-color="#94c45d"/></linearGradient>
+<linearGradient id="gr-fields" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6da75"/><stop offset="1" stop-color="#dfb24a"/></linearGradient>
+<linearGradient id="gr-hills" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6a077"/><stop offset="1" stop-color="#c1653d"/></linearGradient>
+<linearGradient id="gr-mountains" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d0da"/><stop offset="1" stop-color="#8d97a6"/></linearGradient>
+<linearGradient id="gr-desert" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3e6b9"/><stop offset="1" stop-color="#dcc684"/></linearGradient>
+<radialGradient id="hexshade" cx="0.5" cy="0.4" r="0.75"><stop offset="0.55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#1b2a30" stop-opacity=".22"/></radialGradient>
+<radialGradient id="tokengrad" cx="0.4" cy="0.3" r="0.9"><stop offset="0" stop-color="#fffef9"/><stop offset="1" stop-color="#eadfc4"/></radialGradient>
+<radialGradient id="seagrad" cx="0.5" cy="0.45" r="0.7"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<pattern id="furrow" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(-24)"><path d="M0 8H16" stroke="#c4902a" stroke-width="3.2" opacity=".5"/><path d="M0 12.5H16" stroke="#fff3bb" stroke-width="1.6" opacity=".4"/></pattern>
+<pattern id="waves" width="54" height="28" patternUnits="userSpaceOnUse"><path d="M0 14q13.5-11 27 0t27 0" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="2.6" stroke-linecap="round"/></pattern>
+
+<!-- Éléments réutilisables -->
+<g id="pine">
+  <rect x="-2.6" y="-3" width="5.2" height="9" fill="#5b3a22"/>
+  <path d="M0-60 15-31H-15Z" fill="#2b6a3b"/><path d="M0-44 19-13H-19Z" fill="#32794a"/><path d="M0-27 23 2H-23Z" fill="#3b8a55"/>
+  <path d="M0-60 15-31H3Z M0-44 19-13H4Z M0-27 23 2H5Z" fill="#fff" opacity=".13"/>
+</g>
+<g id="lamb">
+  <rect x="-6.5" y="6" width="2.4" height="6" fill="#33392a"/><rect x="4" y="6" width="2.4" height="6" fill="#33392a"/>
+  <ellipse cx="14" cy="-1" rx="4.6" ry="4" fill="#33392a"/>
+  <ellipse cx="0" cy="0" rx="12" ry="8" fill="#fff"/><circle cx="-7" cy="-3" r="5.2" fill="#fff"/><circle cx="-1" cy="-6.5" r="5.8" fill="#fff"/><circle cx="6" cy="-3.5" r="5" fill="#fff"/>
+  <ellipse cx="0" cy="5" rx="11" ry="3" fill="#000" opacity=".06"/>
+</g>
+<g id="tuft">
+  <path d="M0 0V-26M-6 0-10-22M6 0 10-22" stroke="#9a6d12" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <g fill="#f9e38f" stroke="#b98a1c" stroke-width=".9">
+    <ellipse cx="0" cy="-30" rx="3" ry="6"/><ellipse cx="-10.5" cy="-26" rx="2.8" ry="5.4" transform="rotate(-14 -10.5 -26)"/><ellipse cx="10.5" cy="-26" rx="2.8" ry="5.4" transform="rotate(14 10.5 -26)"/>
+  </g>
+</g>
+<g id="bale"><circle r="8.5" fill="#ebc45c" stroke="#a97c1c" stroke-width="1.4"/><path d="M0 0m-3 0a3 3 0 1 1 3 3" fill="none" stroke="#a97c1c" stroke-width="1.2"/></g>
+<g id="brickpile">
+  <g fill="#93421f" stroke="#e8b095" stroke-width=".9">
+    <rect x="-16" y="-4" width="10" height="6" rx="1"/><rect x="-5" y="-4" width="10" height="6" rx="1"/><rect x="6" y="-4" width="10" height="6" rx="1"/>
+    <rect x="-10.5" y="-11" width="10" height="6" rx="1"/><rect x=".5" y="-11" width="10" height="6" rx="1"/>
+    <rect x="-5" y="-18" width="10" height="6" rx="1"/>
+  </g>
+</g>
+<g id="cactus">
+  <rect x="-4" y="-26" width="8" height="30" rx="4" fill="#4e8a4a"/>
+  <path d="M-4-10H-11a4 4 0 0 1-4-4V-20" fill="none" stroke="#4e8a4a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M4-6H11a4 4 0 0 0 4-4V-16" fill="none" stroke="#4e8a4a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M-1-26V0" stroke="#7bb274" stroke-width="1.6" opacity=".7"/>
+</g>
+<g id="flower"><circle r="2.6" fill="#fff7cf"/><circle r="1" fill="#f0b43c"/></g>
+
+<!-- Scènes -->
+<g id="t-forest">
+  <rect x="-100" y="-100" width="200" height="200" fill="url(#gr-forest)"/>
+  <path d="M-100 58Q-45 26 5 52T100 40V100H-100Z" fill="#2c653a" opacity=".5"/>
+  <use href="#pine" transform="translate(-40 -50) scale(.58)"/>
+  <use href="#pine" transform="translate(44 -52) scale(.6)"/>
+  <use href="#pine" transform="translate(-70 -12) scale(.82)"/>
+  <use href="#pine" transform="translate(70 -10) scale(.86)"/>
+  <use href="#pine" transform="translate(-74 40) scale(.62)"/>
+  <use href="#pine" transform="translate(-48 62) scale(.92)"/>
+  <use href="#pine" transform="translate(52 64) scale(.9)"/>
+  <use href="#pine" transform="translate(76 34) scale(.6)"/>
+  <use href="#pine" transform="translate(-10 78) scale(.7)"/>
+  <circle cx="30" cy="70" r="6" fill="#2b6a3b"/><circle cx="-24" cy="72" r="5" fill="#35794a"/>
+</g>
+<g id="t-pasture">
+  <rect x="-100" y="-100" width="200" height="200" fill="url(#gr-pasture)"/>
+  <path d="M-100 14Q-50-18 0 10T100 0V100H-100Z" fill="#a9d36f"/>
+  <path d="M-100 62Q-40 34 20 58T100 48V100H-100Z" fill="#86b852"/>
+  <path d="M-84 -52Q-60-66-36-54" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="3" stroke-linecap="round"/>
+  <g stroke="#8a6a3e" stroke-width="2.4" stroke-linecap="round"><path d="M-84 60H-56M-80 54V66M-66 54V66M-56 54V66"/><path d="M52 -34H80M56 -40V-28M68 -40V-28M78 -40V-28"/></g>
+  <use href="#lamb" transform="translate(-58 28) scale(.9)"/>
+  <use href="#lamb" transform="translate(-46 -26) scale(.7)"/>
+  <use href="#lamb" transform="translate(60 -4) scale(.85)"/>
+  <use href="#lamb" transform="translate(44 62) scale(.8) scale(-1 1)"/>
+  <use href="#flower" transform="translate(-24 -52)"/><use href="#flower" transform="translate(24 -56)"/><use href="#flower" transform="translate(-20 74)"/>
+  <use href="#flower" transform="translate(72 36)"/><use href="#flower" transform="translate(8 82)"/><use href="#flower" transform="translate(-76 -8)"/>
+</g>
+<g id="t-fields">
+  <rect x="-100" y="-100" width="200" height="200" fill="url(#gr-fields)"/>
+  <rect x="-100" y="-100" width="200" height="200" fill="url(#furrow)"/>
+  <path d="M-100 68Q-30 40 40 64T100 56V100H-100Z" fill="#c99a33" opacity=".35"/>
+  <use href="#tuft" transform="translate(-62 -10) scale(.9)"/>
+  <use href="#tuft" transform="translate(-44 54) scale(1)"/>
+  <use href="#tuft" transform="translate(64 -6) scale(.9)"/>
+  <use href="#tuft" transform="translate(48 60) scale(1)"/>
+  <use href="#tuft" transform="translate(-36 -46) scale(.6)"/>
+  <use href="#tuft" transform="translate(40 -50) scale(.6)"/>
+  <use href="#bale" transform="translate(-70 34)"/><use href="#bale" transform="translate(74 36) scale(.8)"/>
+</g>
+<g id="t-hills">
+  <rect x="-100" y="-100" width="200" height="200" fill="url(#gr-hills)"/>
+  <path d="M-100 20Q-50-8 0 14T100 6V100H-100Z" fill="#cf7c52"/>
+  <path d="M-100 48Q-40 22 20 44T100 36V100H-100Z" fill="#b95f38"/>
+  <path d="M-100 76Q-30 56 40 74T100 68V100H-100Z" fill="#a14e2b"/>
+  <ellipse cx="-58" cy="-26" rx="20" ry="8" fill="#7d3a1c"/><ellipse cx="-58" cy="-28" rx="16" ry="5.5" fill="#5f2b14"/>
+  <use href="#brickpile" transform="translate(-58 40) scale(.95)"/>
+  <use href="#brickpile" transform="translate(62 -4) scale(.9)"/>
+  <use href="#brickpile" transform="translate(48 64) scale(.85)"/>
+  <path d="M30-44h14v-10h-14zM30-44q7-12 14 0" fill="#8b3d1d" stroke="#e8b095" stroke-width="1"/>
+</g>
+<g id="t-mountains">
+  <rect x="-100" y="-100" width="200" height="200" fill="url(#gr-mountains)"/>
+  <path d="M-100 8-66-30-34 8-8-24 20 8 52-36 100 20V100H-100Z" fill="#a4aebc"/>
+  <path d="M-96 66-48-30 2 66Z" fill="#6a7484"/><path d="M-48-30 2 66H-18L-44-6Z" fill="#8995a6"/>
+  <path d="M-48-30-60-6-52-12-46-2-39-12-32-4Z" fill="#fff"/>
+  <path d="M-16 66 38-46 98 66Z" fill="#788292"/><path d="M38-46 98 66H70L40-8Z" fill="#8f9bac"/>
+  <path d="M38-46 25-18 33-23 40-12 47-23 56-14Z" fill="#fff"/>
+  <path d="M-100 62Q-40 48 20 64T100 58V100H-100Z" fill="#5e6978"/>
+  <use href="#pine" transform="translate(-72 70) scale(.42)"/><use href="#pine" transform="translate(-58 76) scale(.34)"/><use href="#pine" transform="translate(66 74) scale(.4)"/>
+</g>
+<g id="t-desert">
+  <rect x="-100" y="-100" width="200" height="200" fill="url(#gr-desert)"/>
+  <path d="M-100 26Q-50-4 0 24T100 16V100H-100Z" fill="#ead898"/>
+  <path d="M-100 62Q-30 38 40 64T100 56V100H-100Z" fill="#d6bc76"/>
+  <path d="M-90 40Q-60 28-30 40M20 50Q50 38 84 50M-30 -34Q0-44 30-34" fill="none" stroke="#fff" stroke-opacity=".4" stroke-width="2.4" stroke-linecap="round"/>
+  <use href="#cactus" transform="translate(-60 40) scale(.85)"/>
+  <use href="#cactus" transform="translate(66 -10) scale(.6)"/>
+  <circle cx="60" cy="-60" r="9" fill="#fff4bb" opacity=".8"/>
+</g>
+
+    <symbol id="g-wood" viewBox="-14 -14 28 28">
+      <circle r="13.5" fill="#2c5b36"/>
+      <path d="M0-9 6-1H-6ZM0-4 8 6H-8Z" fill="#e4f2dc"/>
+      <rect x="-1.6" y="6" width="3.2" height="4.5" fill="#e4f2dc"/>
+    </symbol>
+    <symbol id="g-brick" viewBox="-14 -14 28 28">
+      <circle r="13.5" fill="#8f3f22"/>
+      <g fill="#f6d9c9">
+        <rect x="-9" y="-8" width="8.4" height="4.8" rx=".8"/><rect x=".6" y="-8" width="8.4" height="4.8" rx=".8"/>
+        <rect x="-4.2" y="-2.4" width="8.4" height="4.8" rx=".8"/><rect x="-9" y="-2.4" width="3.6" height="4.8" rx=".8"/><rect x="5.4" y="-2.4" width="3.6" height="4.8" rx=".8"/>
+        <rect x="-9" y="3.2" width="8.4" height="4.8" rx=".8"/><rect x=".6" y="3.2" width="8.4" height="4.8" rx=".8"/>
+      </g>
+    </symbol>
+    <symbol id="g-sheep" viewBox="-14 -14 28 28">
+      <circle r="13.5" fill="#5d8a28"/>
+      <g fill="#2b3a1a"><rect x="-5.5" y="5" width="2.2" height="5"/><rect x="2.5" y="5" width="2.2" height="5"/><circle cx="8" cy="-1.5" r="3.4"/></g>
+      <g fill="#fff"><ellipse cx="-.5" cy="1" rx="8.5" ry="6"/><circle cx="-5" cy="-2" r="3.6"/><circle cx="-.5" cy="-4" r="3.8"/><circle cx="4" cy="-2.5" r="3.2"/></g>
+    </symbol>
+    <symbol id="g-wheat" viewBox="-14 -14 28 28">
+      <circle r="13.5" fill="#a67c0a"/>
+      <path d="M0 10V-9" stroke="#fff4cc" stroke-width="1.7" stroke-linecap="round"/>
+      <g fill="#fff4cc">
+        <ellipse cx="-3.6" cy="-4.5" rx="2" ry="3.6" transform="rotate(-28 -3.6 -4.5)"/><ellipse cx="3.6" cy="-4.5" rx="2" ry="3.6" transform="rotate(28 3.6 -4.5)"/>
+        <ellipse cx="-3.6" cy="0.5" rx="2" ry="3.6" transform="rotate(-28 -3.6 .5)"/><ellipse cx="3.6" cy="0.5" rx="2" ry="3.6" transform="rotate(28 3.6 .5)"/>
+        <ellipse cx="-3.6" cy="5.5" rx="2" ry="3.6" transform="rotate(-28 -3.6 5.5)"/><ellipse cx="3.6" cy="5.5" rx="2" ry="3.6" transform="rotate(28 3.6 5.5)"/>
+        <ellipse cx="0" cy="-9.5" rx="1.8" ry="3.2"/>
+      </g>
+    </symbol>
+    <symbol id="g-ore" viewBox="-14 -14 28 28">
+      <circle r="13.5" fill="#566070"/>
+      <path d="M-10 8-3-6 2 2 5-3 11 8Z" fill="#e7ecf2"/>
+      <path d="M-3-6-6-.5-3-1.8 0-.5Z" fill="#9aa5b4"/>
+    </symbol>
+    <symbol id="g-desert" viewBox="-14 -14 28 28">
+      <circle r="13.5" fill="#a58f4b"/>
+      <circle r="4.6" fill="#fff0b0"/>
+      <g stroke="#fff0b0" stroke-width="1.8" stroke-linecap="round"><path d="M0-7.5V-10M0 7.5V10M-7.5 0H-10M7.5 0H10M-5.3-5.3l-1.8-1.8M5.3 5.3l1.8 1.8M5.3-5.3l1.8-1.8M-5.3 5.3l-1.8 1.8"/></g>
+    </symbol>
+  </defs>
+</svg>
+
+<div id="app">
+  <header class="top">
+    <div class="brand"><h1>Colons de l'Île</h1><span>Plateau sur l'écran, mains sur les téléphones</span></div>
+    <div class="top-actions" id="topActions"></div>
+  </header>
+  <main id="welcome" class="card welcome" hidden></main>
+  <div id="game" class="layout" hidden>
+    <section class="stage" aria-label="Plateau de jeu">
+      <div class="stage-card">
+        <div class="banner" id="banner"></div>
+        <svg id="board" viewBox="-560 -520 1120 1040" role="img" aria-label="Plateau hexagonal"></svg>
+        <div id="over" hidden></div>
+      </div>
+    </section>
+    <div class="side">
+      <section class="card hand" id="hand" aria-label="Main du joueur"></section>
+      <section class="card scores" id="scores" aria-label="Scores"></section>
+      <section class="card log" id="log" aria-label="Journal"></section>
+    </div>
+  </div>
+  <nav id="nav" class="nav" hidden aria-label="Navigation du téléphone"></nav>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+// Moteur de règles de « Colons de l'Île ». Pur : pas de DOM, pas de Math.random, état = JSON.
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.Engine = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const RES = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
+  const RES_FR = { wood: 'bois', brick: 'argile', sheep: 'laine', wheat: 'blé', ore: 'minerai' };
+  const TERRAIN_RES = { forest: 'wood', hills: 'brick', pasture: 'sheep', fields: 'wheat', mountains: 'ore', desert: null };
+  const COLORS = ['red', 'blue', 'orange', 'white'];
+  const COST = {
+    road: { wood: 1, brick: 1 },
+    settlement: { wood: 1, brick: 1, sheep: 1, wheat: 1 },
+    city: { wheat: 2, ore: 3 },
+    dev: { sheep: 1, wheat: 1, ore: 1 },
+  };
+  const LIMITS = { road: 15, settlement: 5, city: 4 };
+  const DEV_FR = { knight: 'Chevalier', vp: 'Point de victoire', roadBuilding: 'Construction de routes', yearOfPlenty: 'Invention', monopoly: 'Monopole' };
+  const WIN_POINTS = 10;
+
+  class RuleError extends Error {}
+  const need = (cond, msg) => { if (!cond) throw new RuleError(msg); };
+
+  // ---------- Hasard à graine (mulberry32), stocké dans l'état ----------
+  function rngNext(s) {
+    s.rng = (s.rng + 0x6D2B79F5) | 0;
+    let t = s.rng;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  const rint = (s, n) => Math.floor(rngNext(s) * n);
+  function shuffle(s, a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = rint(s, i + 1);
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // ---------- Utilitaires ----------
+  const zero = () => ({ wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 });
+  const total = (h) => RES.reduce((n, r) => n + h[r], 0);
+  const has = (h, c) => RES.every((r) => h[r] >= (c[r] || 0));
+  const repeat = (x, n) => Array.from({ length: n }, () => x);
+  function clone(s) {
+    const board = s.board;
+    s.board = null;
+    const c = JSON.parse(JSON.stringify(s));
+    s.board = board;
+    c.board = board;
+    return c;
+  }
+  function log(s, text) {
+    s.log.push(text);
+    if (s.log.length > 300) s.log.splice(0, s.log.length - 300);
+  }
+  const nameOf = (s, p) => s.players[p].name;
+
+  // ---------- Plateau ----------
+  const HEX_DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+
+  const SPIRAL_TOKENS = [5, 2, 6, 3, 8, 10, 9, 12, 11, 4, 8, 10, 9, 4, 5, 6, 3, 11];
+
+  function ringCoords(radius) {
+    if (radius === 0) return [[0, 0]];
+    const out = [];
+    let q = HEX_DIRS[4][0] * radius, r = HEX_DIRS[4][1] * radius;
+    for (let side = 0; side < 6; side++) {
+      for (let j = 0; j < radius; j++) {
+        out.push([q, r]);
+        q += HEX_DIRS[side][0];
+        r += HEX_DIRS[side][1];
+      }
+    }
+    return out;
+  }
+
+  // Ordre de pose des jetons : couronne extérieure depuis un coin tiré au hasard,
+  // dans un sens tiré au hasard, puis couronne intérieure, puis le centre.
+  function spiralOrder(s) {
+    const corner = rint(s, 6);
+    const reversed = rint(s, 2) === 1;
+    let outer = ringCoords(2);
+    outer = outer.slice(corner * 2).concat(outer.slice(0, corner * 2));
+    const [oq, or] = outer[0];
+    let inner = ringCoords(1);
+    const at = inner.findIndex(([q, r]) => q === oq / 2 && r === or / 2);
+    inner = inner.slice(at).concat(inner.slice(0, at));
+    if (reversed) {
+      outer = [outer[0], ...outer.slice(1).reverse()];
+      inner = [inner[0], ...inner.slice(1).reverse()];
+    }
+    return outer.concat(inner, [[0, 0]]);
+  }
+
+  function buildBoard(s) {
+    const coords = [];
+    for (let q = -2; q <= 2; q++) for (let r = -2; r <= 2; r++) if (Math.abs(q + r) <= 2) coords.push([q, r]);
+
+    const hexes = coords.map(([q, r], id) => ({
+      id, q, r,
+      x: Math.sqrt(3) * (q + r / 2),
+      y: 1.5 * r,
+      terrain: null,
+      number: null,
+      vertices: [],
+    }));
+    const hexAt = (q, r) => hexes.find((h) => h.q === q && h.r === r);
+    const hexNbrs = (h) => HEX_DIRS.map(([dq, dr]) => hexAt(h.q + dq, h.r + dr)).filter(Boolean);
+    const hot = (h) => h.number === 6 || h.number === 8;
+
+    // Comme le vrai jeu : tuiles mélangées, puis jetons A à R posés en spirale
+    // depuis un coin de la côte, vers l'intérieur, en sautant le désert.
+    let spiral = [];
+    for (let tries = 0; tries < 200; tries++) {
+      const terrains = shuffle(s, [
+        ...repeat('forest', 4), ...repeat('pasture', 4), ...repeat('fields', 4),
+        ...repeat('hills', 3), ...repeat('mountains', 3), 'desert',
+      ]);
+      hexes.forEach((h, i) => { h.terrain = terrains[i]; h.number = null; });
+      spiral = spiralOrder(s).map(([q, r]) => hexAt(q, r).id);
+      let k = 0;
+      spiral.forEach((id) => {
+        if (hexes[id].terrain !== 'desert') hexes[id].number = SPIRAL_TOKENS[k++];
+      });
+      if (!hexes.some((h) => hot(h) && hexNbrs(h).some((n) => hot(n)))) break;
+    }
+
+    // Sommets et arêtes dédupliqués par position.
+    const vertices = [];
+    const vIndex = new Map();
+    const edges = [];
+    const eIndex = new Map();
+    const vertexId = (x, y) => {
+      const key = Math.round(x * 1000) + ',' + Math.round(y * 1000);
+      if (!vIndex.has(key)) {
+        vIndex.set(key, vertices.length);
+        vertices.push({ id: vertices.length, x, y, hexes: [], nbrs: [], edges: [], port: null });
+      }
+      return vIndex.get(key);
+    };
+    hexes.forEach((h) => {
+      for (let i = 0; i < 6; i++) {
+        const a = ((60 * i - 30) * Math.PI) / 180;
+        const id = vertexId(h.x + Math.cos(a), h.y + Math.sin(a));
+        h.vertices.push(id);
+        vertices[id].hexes.push(h.id);
+      }
+      for (let i = 0; i < 6; i++) {
+        const a = h.vertices[i];
+        const b = h.vertices[(i + 1) % 6];
+        const key = Math.min(a, b) + '-' + Math.max(a, b);
+        if (!eIndex.has(key)) {
+          eIndex.set(key, edges.length);
+          edges.push({ id: edges.length, a, b, hexes: [] });
+        }
+        edges[eIndex.get(key)].hexes.push(h.id);
+      }
+    });
+    edges.forEach((e) => {
+      vertices[e.a].edges.push(e.id);
+      vertices[e.b].edges.push(e.id);
+      vertices[e.a].nbrs.push(e.b);
+      vertices[e.b].nbrs.push(e.a);
+    });
+
+    // Ports : 9 sur les 30 arêtes côtières, espacés 3-3-4.
+    const coast = edges
+      .filter((e) => e.hexes.length === 1)
+      .map((e) => {
+        const A = vertices[e.a], B = vertices[e.b];
+        const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
+        return { e, mx, my, ang: Math.atan2(my, mx) };
+      })
+      .sort((p, q) => p.ang - q.ang);
+    const types = shuffle(s, ['any', 'any', 'any', 'any', 'wood', 'brick', 'sheep', 'wheat', 'ore']);
+    const gaps = [0, 3, 6, 10, 13, 16, 20, 23, 26];
+    const ports = gaps.map((g, i) => {
+      const c = coast[g % coast.length];
+      const h = hexes[c.e.hexes[0]];
+      const dx = c.mx - h.x, dy = c.my - h.y;
+      const len = Math.hypot(dx, dy);
+      vertices[c.e.a].port = types[i];
+      vertices[c.e.b].port = types[i];
+      return { edge: c.e.id, a: c.e.a, b: c.e.b, type: types[i], x: c.mx, y: c.my, nx: dx / len, ny: dy / len };
+    });
+
+    return { hexes, vertices, edges, ports, spiral };
+  }
+
+  // Le plateau ne dépend que de la graine : un téléphone le reconstruit sans le recevoir.
+  function boardFromSeed(seed) {
+    return buildBoard({ rng: seed | 0 });
+  }
+
+  // ---------- Création de partie ----------
+  function newGame(opts) {
+    const names = opts.names;
+    need(names.length >= 2 && names.length <= 4, 'Entre 2 et 4 joueurs.');
+    const seed = (opts.seed == null ? 1 : opts.seed) | 0;
+    const s = { rng: seed, seed };
+    s.board = buildBoard(s);
+    s.players = names.map((name, id) => ({
+      id, name, color: COLORS[id],
+      hand: zero(), dev: [], knights: 0,
+    }));
+    s.bank = { wood: 19, brick: 19, sheep: 19, wheat: 19, ore: 19 };
+    s.devDeck = shuffle(s, [
+      ...repeat('knight', 14), ...repeat('vp', 5), ...repeat('roadBuilding', 2),
+      ...repeat('yearOfPlenty', 2), ...repeat('monopoly', 2),
+    ]);
+    s.buildings = {};
+    s.roads = {};
+    s.robber = s.board.hexes.find((h) => h.terrain === 'desert').id;
+    const n = names.length;
+    const order = [];
+    for (let i = 0; i < n; i++) order.push(i);
+    for (let i = n - 1; i >= 0; i--) order.push(i);
+    s.setup = { idx: 0, order, last: null };
+    s.phase = 'setup';
+    s.step = 'settlement';
+    s.turn = 0;
+    s.turnNo = 0;
+    s.dice = null;
+    s.discard = {};
+    s.victims = [];
+    s.returnStep = 'actions';
+    s.freeRoads = 0;
+    s.devPlayed = false;
+    s.trade = null;
+    s.longestRoad = { holder: null, len: 0 };
+    s.largestArmy = { holder: null, size: 0 };
+    s.winner = null;
+    s.log = [];
+    log(s, 'La partie commence. ' + nameOf(s, 0) + ' pose sa première colonie.');
+    return s;
+  }
+
+  // ---------- Requêtes de règles ----------
+  const buildingsOf = (s, pid, type) => Object.keys(s.buildings).filter((v) => s.buildings[v].owner === pid && (!type || s.buildings[v].type === type)).length;
+  const roadsOf = (s, pid) => Object.keys(s.roads).filter((e) => s.roads[e] === pid).length;
+
+  function legalSettlements(s, pid, free) {
+    return s.board.vertices.filter((v) => {
+      if (s.buildings[v.id]) return false;
+      if (v.nbrs.some((n) => s.buildings[n])) return false;
+      return free || v.edges.some((e) => s.roads[e] === pid);
+    }).map((v) => v.id);
+  }
+  function legalCities(s, pid) {
+    return Object.keys(s.buildings).filter((v) => s.buildings[v].owner === pid && s.buildings[v].type === 'settlement').map(Number);
+  }
+  function legalRoads(s, pid, fromVertex) {
+    return s.board.edges.filter((e) => {
+      if (s.roads[e.id] !== undefined) return false;
+      if (fromVertex != null) return e.a === fromVertex || e.b === fromVertex;
+      return [e.a, e.b].some((v) => {
+        const b = s.buildings[v];
+        if (b) return b.owner === pid;
+        return s.board.vertices[v].edges.some((x) => x !== e.id && s.roads[x] === pid);
+      });
+    }).map((e) => e.id);
+  }
+  function legalRobberHexes(s) {
+    return s.board.hexes.filter((h) => h.id !== s.robber).map((h) => h.id);
+  }
+
+  function tradeRatios(s, pid) {
+    const r = { wood: 4, brick: 4, sheep: 4, wheat: 4, ore: 4 };
+    s.board.vertices.forEach((v) => {
+      const b = s.buildings[v.id];
+      if (!b || b.owner !== pid || !v.port) return;
+      if (v.port === 'any') RES.forEach((k) => { r[k] = Math.min(r[k], 3); });
+      else r[v.port] = Math.min(r[v.port], 2);
+    });
+    return r;
+  }
+
+  const devPlayable = (s, p, kind) => p.dev.some((c) => c.k === kind && c.t < s.turnNo);
+
+  // Plus longue route d'un joueur : parcours en profondeur, les colonies adverses coupent la chaîne.
+  function longestRoadOf(s, pid) {
+    const verts = s.board.vertices;
+    const mine = (e) => s.roads[e] === pid;
+    const blocked = (v) => s.buildings[v] && s.buildings[v].owner !== pid;
+    const used = new Set();
+    const other = (e, v) => (s.board.edges[e].a === v ? s.board.edges[e].b : s.board.edges[e].a);
+    function dfs(v) {
+      let best = 0;
+      for (const e of verts[v].edges) {
+        if (!mine(e) || used.has(e)) continue;
+        used.add(e);
+        const w = other(e, v);
+        best = Math.max(best, 1 + (blocked(w) ? 0 : dfs(w)));
+        used.delete(e);
+      }
+      return best;
+    }
+    let best = 0;
+    verts.forEach((v) => { if (v.edges.some(mine)) best = Math.max(best, dfs(v.id)); });
+    return best;
+  }
+
+  function points(s, pid, withHidden) {
+    let n = buildingsOf(s, pid, 'settlement') + 2 * buildingsOf(s, pid, 'city');
+    if (s.longestRoad.holder === pid) n += 2;
+    if (s.largestArmy.holder === pid) n += 2;
+    if (withHidden) n += s.players[pid].dev.filter((c) => c.k === 'vp').length;
+    return n;
+  }
+
+  // ---------- Effets ----------
+  function pay(s, p, cost) {
+    RES.forEach((r) => { p.hand[r] -= cost[r] || 0; s.bank[r] += cost[r] || 0; });
+  }
+  function grant(s, p, r, n) {
+    p.hand[r] += n;
+    s.bank[r] -= n;
+  }
+
+  function produce(s, n) {
+    const want = {};
+    s.board.hexes.forEach((h) => {
+      if (h.number !== n || h.id === s.robber) return;
+      const res = TERRAIN_RES[h.terrain];
+      h.vertices.forEach((v) => {
+        const b = s.buildings[v];
+        if (!b) return;
+        want[res] = want[res] || {};
+        want[res][b.owner] = (want[res][b.owner] || 0) + (b.type === 'city' ? 2 : 1);
+      });
+    });
+    const gains = [];
+    Object.keys(want).forEach((res) => {
+      const owners = Object.keys(want[res]).map(Number);
+      const sum = owners.reduce((a, o) => a + want[res][o], 0);
+      if (sum <= s.bank[res]) {
+        owners.forEach((o) => { grant(s, s.players[o], res, want[res][o]); gains.push([o, res, want[res][o]]); });
+      } else if (owners.length === 1) {
+        const n2 = s.bank[res];
+        if (n2 > 0) { grant(s, s.players[owners[0]], res, n2); gains.push([owners[0], res, n2]); }
+      } else {
+        log(s, 'La banque n\'a pas assez de ' + RES_FR[res] + ' : personne n\'en reçoit.');
+      }
+    });
+    const byPlayer = {};
+    gains.forEach(([o, res, k]) => { (byPlayer[o] = byPlayer[o] || []).push(k + ' ' + RES_FR[res]); });
+    const parts = Object.keys(byPlayer).map((o) => nameOf(s, +o) + ' reçoit ' + byPlayer[o].join(', '));
+    log(s, parts.length ? parts.join(' ; ') + '.' : 'Personne ne produit.');
+  }
+
+  function startRobber(s, returnStep) {
+    s.returnStep = returnStep;
+    s.step = 'robber';
+  }
+
+  function stealFrom(s, thief, victim) {
+    const v = s.players[victim];
+    const pool = [];
+    RES.forEach((r) => pool.push(...repeat(r, v.hand[r])));
+    if (!pool.length) return;
+    const r = pool[rint(s, pool.length)];
+    v.hand[r]--;
+    s.players[thief].hand[r]++;
+    log(s, nameOf(s, thief) + ' vole une carte à ' + nameOf(s, victim) + '.');
+  }
+
+  function checkRoadAndArmy(s) {
+    const lens = s.players.map((p) => longestRoadOf(s, p.id));
+    const max = Math.max(...lens);
+    const prev = s.longestRoad.holder;
+    let holder = null;
+    if (max >= 5) {
+      const top = lens.map((l, i) => (l === max ? i : -1)).filter((i) => i >= 0);
+      if (prev !== null && top.includes(prev)) holder = prev;
+      else if (top.length === 1) holder = top[0];
+    }
+    if (holder !== prev && holder !== null) log(s, nameOf(s, holder) + ' obtient la plus longue route (' + max + ').');
+    if (holder !== prev && holder === null) log(s, 'Plus personne n\'a la plus longue route.');
+    s.longestRoad = { holder, len: holder === null ? 0 : max };
+    s.players.forEach((p, i) => { p.roadLen = lens[i]; });
+
+    let ah = s.largestArmy.holder;
+    let best = s.largestArmy.size;
+    s.players.forEach((p) => {
+      if (p.knights >= 3 && p.knights > best) {
+        ah = p.id;
+        best = p.knights;
+      }
+    });
+    if (ah !== s.largestArmy.holder) log(s, nameOf(s, ah) + ' obtient la plus grande armée (' + best + ').');
+    s.largestArmy = { holder: ah, size: best };
+  }
+
+  function afterAction(s) {
+    checkRoadAndArmy(s);
+    if (s.phase === 'main' && points(s, s.turn, true) >= WIN_POINTS) {
+      s.phase = 'ended';
+      s.step = 'ended';
+      s.winner = s.turn;
+      s.trade = null;
+      log(s, nameOf(s, s.turn) + ' remporte la partie avec ' + points(s, s.turn, true) + ' points !');
+    }
+  }
+
+  // ---------- Actions ----------
+  const handlers = {};
+
+  function turnOnly(s, a) {
+    need(s.phase !== 'ended', 'La partie est terminée.');
+    need(a.player === s.turn, 'Ce n\'est pas ton tour.');
+  }
+  function mainActions(s, a) {
+    turnOnly(s, a);
+    need(s.phase === 'main' && s.step === 'actions', 'Tu ne peux pas faire ça maintenant.');
+  }
+  function clearTrade(s) { s.trade = null; }
+
+  handlers.placeSettlement = (s, a) => {
+    turnOnly(s, a);
+    const p = s.players[a.player];
+    if (s.phase === 'setup') {
+      need(s.step === 'settlement', 'Pose d\'abord ta route.');
+      need(legalSettlements(s, a.player, true).includes(a.vertex), 'Emplacement interdit.');
+      s.buildings[a.vertex] = { owner: a.player, type: 'settlement' };
+      s.setup.last = a.vertex;
+      if (s.setup.idx >= s.players.length) {
+        const got = [];
+        s.board.vertices[a.vertex].hexes.forEach((hid) => {
+          const res = TERRAIN_RES[s.board.hexes[hid].terrain];
+          if (res && s.bank[res] > 0) { grant(s, p, res, 1); got.push(RES_FR[res]); }
+        });
+        if (got.length) log(s, p.name + ' reçoit ' + got.join(', ') + '.');
+      }
+      s.step = 'road';
+      log(s, p.name + ' pose une colonie.');
+      return;
+    }
+    mainActions(s, a);
+    need(buildingsOf(s, a.player, 'settlement') < LIMITS.settlement, 'Plus de colonies disponibles.');
+    need(has(p.hand, COST.settlement), 'Pas assez de ressources.');
+    need(legalSettlements(s, a.player, false).includes(a.vertex), 'Emplacement interdit.');
+    pay(s, p, COST.settlement);
+    s.buildings[a.vertex] = { owner: a.player, type: 'settlement' };
+    clearTrade(s);
+    log(s, p.name + ' construit une colonie.');
+  };
+
+  handlers.placeCity = (s, a) => {
+    mainActions(s, a);
+    const p = s.players[a.player];
+    need(buildingsOf(s, a.player, 'city') < LIMITS.city, 'Plus de villes disponibles.');
+    need(has(p.hand, COST.city), 'Pas assez de ressources.');
+    need(legalCities(s, a.player).includes(a.vertex), 'Il faut une de tes colonies.');
+    pay(s, p, COST.city);
+    s.buildings[a.vertex].type = 'city';
+    clearTrade(s);
+    log(s, p.name + ' transforme une colonie en ville.');
+  };
+
+  handlers.placeRoad = (s, a) => {
+    turnOnly(s, a);
+    const p = s.players[a.player];
+    if (s.phase === 'setup') {
+      need(s.step === 'road', 'Pose d\'abord ta colonie.');
+      need(legalRoads(s, a.player, s.setup.last).includes(a.edge), 'La route doit toucher ta nouvelle colonie.');
+      s.roads[a.edge] = a.player;
+      log(s, p.name + ' pose une route.');
+      s.setup.idx++;
+      if (s.setup.idx >= s.setup.order.length) {
+        s.phase = 'main';
+        s.step = 'roll';
+        s.turn = s.setup.order[s.setup.order.length - 1];
+        s.turnNo = 1;
+        log(s, 'Mise en place terminée. ' + nameOf(s, s.turn) + ' commence.');
+      } else {
+        s.turn = s.setup.order[s.setup.idx];
+        s.step = 'settlement';
+      }
+      return;
+    }
+    need(s.phase === 'main', 'Tu ne peux pas faire ça maintenant.');
+    need(roadsOf(s, a.player) < LIMITS.road, 'Plus de routes disponibles.');
+    need(legalRoads(s, a.player).includes(a.edge), 'Emplacement interdit.');
+    if (s.step === 'roadBuilding') {
+      s.roads[a.edge] = a.player;
+      s.freeRoads--;
+      log(s, p.name + ' pose une route gratuite.');
+      if (s.freeRoads <= 0 || roadsOf(s, a.player) >= LIMITS.road || !legalRoads(s, a.player).length) {
+        s.freeRoads = 0;
+        s.step = s.returnStep;
+      }
+      return;
+    }
+    need(s.step === 'actions', 'Tu ne peux pas faire ça maintenant.');
+    need(has(p.hand, COST.road), 'Pas assez de ressources.');
+    pay(s, p, COST.road);
+    s.roads[a.edge] = a.player;
+    clearTrade(s);
+    log(s, p.name + ' construit une route.');
+  };
+
+  handlers.roll = (s, a) => {
+    turnOnly(s, a);
+    need(s.phase === 'main' && s.step === 'roll', 'Les dés sont déjà lancés.');
+    const d1 = rint(s, 6) + 1, d2 = rint(s, 6) + 1;
+    s.dice = [d1, d2];
+    const sum = d1 + d2;
+    log(s, nameOf(s, a.player) + ' lance les dés : ' + d1 + ' + ' + d2 + ' = ' + sum + '.');
+    if (sum !== 7) {
+      produce(s, sum);
+      s.step = 'actions';
+      return;
+    }
+    s.discard = {};
+    s.players.forEach((p) => {
+      const n = total(p.hand);
+      if (n > 7) s.discard[p.id] = Math.floor(n / 2);
+    });
+    if (Object.keys(s.discard).length) {
+      s.returnStep = 'actions';
+      s.step = 'discard';
+      log(s, 'Un 7 ! Les joueurs avec plus de 7 cartes en défaussent la moitié.');
+    } else {
+      log(s, 'Un 7 ! Le voleur se déplace.');
+      startRobber(s, 'actions');
+    }
+  };
+
+  handlers.discard = (s, a) => {
+    need(s.phase === 'main' && s.step === 'discard', 'Pas de défausse en cours.');
+    const owed = s.discard[a.player];
+    need(owed, 'Tu n\'as rien à défausser.');
+    const cards = a.cards || {};
+    const n = RES.reduce((k, r) => k + (cards[r] || 0), 0);
+    need(n === owed, 'Il faut défausser exactement ' + owed + ' cartes.');
+    need(RES.every((r) => (cards[r] || 0) >= 0 && Number.isInteger(cards[r] || 0)), 'Quantité invalide.');
+    const p = s.players[a.player];
+    need(has(p.hand, cards), 'Tu n\'as pas ces cartes.');
+    pay(s, p, cards);
+    delete s.discard[a.player];
+    log(s, p.name + ' défausse ' + n + ' cartes.');
+    if (!Object.keys(s.discard).length) startRobber(s, 'actions');
+  };
+
+  handlers.moveRobber = (s, a) => {
+    turnOnly(s, a);
+    need(s.step === 'robber', 'Le voleur ne bouge pas maintenant.');
+    need(legalRobberHexes(s).includes(a.hex), 'Choisis un autre hexagone.');
+    s.robber = a.hex;
+    const h = s.board.hexes[a.hex];
+    const victims = [];
+    h.vertices.forEach((v) => {
+      const b = s.buildings[v];
+      if (b && b.owner !== a.player && total(s.players[b.owner].hand) > 0 && !victims.includes(b.owner)) victims.push(b.owner);
+    });
+    log(s, nameOf(s, a.player) + ' déplace le voleur.');
+    if (victims.length === 0) s.step = s.returnStep;
+    else if (victims.length === 1) { stealFrom(s, a.player, victims[0]); s.step = s.returnStep; }
+    else { s.victims = victims; s.step = 'steal'; }
+  };
+
+  handlers.steal = (s, a) => {
+    turnOnly(s, a);
+    need(s.step === 'steal', 'Pas de vol en cours.');
+    need(s.victims.includes(a.victim), 'Joueur non éligible.');
+    stealFrom(s, a.player, a.victim);
+    s.victims = [];
+    s.step = s.returnStep;
+  };
+
+  handlers.buyDev = (s, a) => {
+    mainActions(s, a);
+    const p = s.players[a.player];
+    need(s.devDeck.length > 0, 'Plus de cartes de développement.');
+    need(has(p.hand, COST.dev), 'Pas assez de ressources.');
+    pay(s, p, COST.dev);
+    const k = s.devDeck.pop();
+    p.dev.push({ k, t: s.turnNo });
+    clearTrade(s);
+    log(s, p.name + ' achète une carte de développement.');
+  };
+
+  function useDev(s, a, kind) {
+    turnOnly(s, a);
+    need(s.phase === 'main' && (s.step === 'roll' || s.step === 'actions'), 'Tu ne peux pas jouer de carte maintenant.');
+    need(!s.devPlayed, 'Une seule carte de développement par tour.');
+    const p = s.players[a.player];
+    need(devPlayable(s, p, kind), 'Tu n\'as pas cette carte, ou elle vient d\'être achetée.');
+    const i = p.dev.findIndex((c) => c.k === kind && c.t < s.turnNo);
+    p.dev.splice(i, 1);
+    s.devPlayed = true;
+    clearTrade(s);
+    return p;
+  }
+
+  handlers.playKnight = (s, a) => {
+    const prev = s.step;
+    const p = useDev(s, a, 'knight');
+    p.knights++;
+    log(s, p.name + ' joue un chevalier.');
+    startRobber(s, prev);
+  };
+
+  handlers.playRoadBuilding = (s, a) => {
+    need(roadsOf(s, a.player) < LIMITS.road && legalRoads(s, a.player).length > 0, 'Aucune route possible.');
+    const prev = s.step;
+    const p = useDev(s, a, 'roadBuilding');
+    s.freeRoads = Math.min(2, LIMITS.road - roadsOf(s, a.player));
+    s.returnStep = prev;
+    s.step = 'roadBuilding';
+    log(s, p.name + ' joue Construction de routes.');
+  };
+
+  handlers.playYearOfPlenty = (s, a) => {
+    need(RES.includes(a.a) && RES.includes(a.b), 'Choisis deux ressources.');
+    const want = zero();
+    want[a.a]++;
+    want[a.b]++;
+    need(has(s.bank, want), 'La banque n\'a pas assez de cartes.');
+    const p = useDev(s, a, 'yearOfPlenty');
+    grant(s, p, a.a, 1);
+    grant(s, p, a.b, 1);
+    log(s, p.name + ' joue Invention et prend ' + RES_FR[a.a] + ' et ' + RES_FR[a.b] + '.');
+  };
+
+  handlers.playMonopoly = (s, a) => {
+    need(RES.includes(a.res), 'Choisis une ressource.');
+    const p = useDev(s, a, 'monopoly');
+    let n = 0;
+    s.players.forEach((o) => {
+      if (o.id === p.id) return;
+      n += o.hand[a.res];
+      p.hand[a.res] += o.hand[a.res];
+      o.hand[a.res] = 0;
+    });
+    log(s, p.name + ' joue Monopole sur ' + RES_FR[a.res] + ' et récupère ' + n + ' carte(s).');
+  };
+
+  handlers.bankTrade = (s, a) => {
+    mainActions(s, a);
+    need(RES.includes(a.give) && RES.includes(a.get) && a.give !== a.get, 'Échange invalide.');
+    const p = s.players[a.player];
+    const ratio = tradeRatios(s, a.player)[a.give];
+    need(p.hand[a.give] >= ratio, 'Il te faut ' + ratio + ' ' + RES_FR[a.give] + '.');
+    need(s.bank[a.get] > 0, 'La banque n\'a plus de ' + RES_FR[a.get] + '.');
+    p.hand[a.give] -= ratio;
+    s.bank[a.give] += ratio;
+    grant(s, p, a.get, 1);
+    clearTrade(s);
+    log(s, p.name + ' échange ' + ratio + ' ' + RES_FR[a.give] + ' contre 1 ' + RES_FR[a.get] + ' à la banque.');
+  };
+
+  function cleanBundle(b) {
+    const out = zero();
+    RES.forEach((r) => {
+      const n = (b && b[r]) || 0;
+      need(Number.isInteger(n) && n >= 0, 'Quantité invalide.');
+      out[r] = n;
+    });
+    return out;
+  }
+
+  handlers.offerTrade = (s, a) => {
+    mainActions(s, a);
+    const give = cleanBundle(a.give), want = cleanBundle(a.want);
+    need(total(give) > 0 && total(want) > 0, 'Propose au moins une carte de chaque côté.');
+    need(!RES.some((r) => give[r] > 0 && want[r] > 0), 'Ne demande pas la ressource que tu donnes.');
+    need(has(s.players[a.player].hand, give), 'Tu n\'as pas ces cartes.');
+    s.trade = { from: a.player, give, want, responses: {} };
+    log(s, nameOf(s, a.player) + ' propose un échange.');
+  };
+
+  handlers.respondTrade = (s, a) => {
+    need(s.trade, 'Aucune offre en cours.');
+    need(a.player !== s.trade.from, 'C\'est ton offre.');
+    if (a.accept) need(has(s.players[a.player].hand, s.trade.want), 'Tu n\'as pas les cartes demandées.');
+    s.trade.responses[a.player] = !!a.accept;
+  };
+
+  handlers.confirmTrade = (s, a) => {
+    mainActions(s, a);
+    const t = s.trade;
+    need(t && t.from === a.player, 'Aucune offre en cours.');
+    need(t.responses[a.with] === true, 'Ce joueur n\'a pas accepté.');
+    const me = s.players[a.player], they = s.players[a.with];
+    need(has(me.hand, t.give) && has(they.hand, t.want), 'Les mains ont changé, échange impossible.');
+    RES.forEach((r) => {
+      me.hand[r] += t.want[r] - t.give[r];
+      they.hand[r] += t.give[r] - t.want[r];
+    });
+    s.trade = null;
+    log(s, me.name + ' et ' + they.name + ' concluent un échange.');
+  };
+
+  handlers.cancelTrade = (s, a) => {
+    turnOnly(s, a);
+    need(s.trade, 'Aucune offre en cours.');
+    s.trade = null;
+  };
+
+  handlers.endTurn = (s, a) => {
+    mainActions(s, a);
+    s.trade = null;
+    s.turn = (s.turn + 1) % s.players.length;
+    s.turnNo++;
+    s.step = 'roll';
+    s.dice = null;
+    s.devPlayed = false;
+    log(s, 'Au tour de ' + nameOf(s, s.turn) + '.');
+  };
+
+  function apply(state, action) {
+    const s = clone(state);
+    try {
+      const h = handlers[action && action.type];
+      need(h, 'Action inconnue.');
+      need(Number.isInteger(action.player) && action.player >= 0 && action.player < s.players.length, 'Joueur inconnu.');
+      h(s, action);
+      afterAction(s);
+      return { ok: true, state: s };
+    } catch (e) {
+      if (e instanceof RuleError) return { ok: false, error: e.message, state };
+      throw e;
+    }
+  }
+
+  // ---------- Ce que l'interface a le droit de proposer ----------
+  function available(s, pid) {
+    const p = s.players[pid];
+    const mine = s.phase !== 'ended' && s.turn === pid;
+    const main = s.phase === 'main';
+    const acts = mine && main && s.step === 'actions';
+    const canDevNow = mine && main && (s.step === 'roll' || s.step === 'actions') && !s.devPlayed;
+    const afford = (c) => has(p.hand, c);
+    const out = {
+      myTurn: mine,
+      roll: mine && main && s.step === 'roll',
+      endTurn: acts,
+      discard: s.phase === 'main' && s.step === 'discard' ? s.discard[pid] || 0 : 0,
+      moveRobber: mine && s.step === 'robber',
+      steal: mine && s.step === 'steal' ? s.victims.slice() : null,
+      setupSettlement: mine && s.phase === 'setup' && s.step === 'settlement',
+      setupRoad: mine && s.phase === 'setup' && s.step === 'road',
+      freeRoad: mine && s.step === 'roadBuilding',
+      road: acts && afford(COST.road) && roadsOf(s, pid) < LIMITS.road && legalRoads(s, pid).length > 0,
+      settlement: acts && afford(COST.settlement) && buildingsOf(s, pid, 'settlement') < LIMITS.settlement && legalSettlements(s, pid, false).length > 0,
+      city: acts && afford(COST.city) && buildingsOf(s, pid, 'city') < LIMITS.city && legalCities(s, pid).length > 0,
+      buyDev: acts && afford(COST.dev) && (s.devDeck ? s.devDeck.length : s.devDeckCount) > 0,
+      trade: acts,
+      ratios: tradeRatios(s, pid),
+      dev: {
+        knight: canDevNow && devPlayable(s, p, 'knight'),
+        roadBuilding: canDevNow && devPlayable(s, p, 'roadBuilding') && legalRoads(s, pid).length > 0 && roadsOf(s, pid) < LIMITS.road,
+        yearOfPlenty: canDevNow && devPlayable(s, p, 'yearOfPlenty') && total(s.bank) >= 2,
+        monopoly: canDevNow && devPlayable(s, p, 'monopoly'),
+      },
+      respondTrade: !!(s.trade && s.trade.from !== pid && s.phase === 'main'),
+    };
+    // Surlignage de plateau selon l'étape.
+    out.targets = { vertices: [], edges: [], hexes: [] };
+    if (out.setupSettlement) out.targets.vertices = legalSettlements(s, pid, true);
+    if (out.setupRoad) out.targets.edges = legalRoads(s, pid, s.setup.last);
+    if (out.moveRobber) out.targets.hexes = legalRobberHexes(s);
+    if (out.freeRoad) out.targets.edges = legalRoads(s, pid);
+    return out;
+  }
+
+  // Emplacements pour un mode de construction demandé depuis la main.
+  function targetsFor(s, pid, kind) {
+    if (kind === 'road') return { edges: legalRoads(s, pid) };
+    if (kind === 'settlement') return { vertices: legalSettlements(s, pid, false) };
+    if (kind === 'city') return { vertices: legalCities(s, pid) };
+    return {};
+  }
+
+  // Qui doit agir maintenant (utile à l'interface et au réseau).
+  function actors(s) {
+    if (s.phase === 'ended') return [];
+    if (s.phase === 'main' && s.step === 'discard') return Object.keys(s.discard).map(Number);
+    return [s.turn];
+  }
+
+  // Vue sûre à envoyer à un client : ses cartes en clair, celles des autres en nombre seulement.
+  // opts.board:false retire le plateau (le client le reconstruit depuis la graine), opts.log limite le journal.
+  function viewFor(s, pid, opts) {
+    const o = opts || {};
+    const v = clone(s);
+    v.seed = s.seed;
+    delete v.rng;
+    v.devDeckCount = v.devDeck.length;
+    delete v.devDeck;
+    if (o.board === false) delete v.board;
+    if (o.log) v.log = v.log.slice(-o.log);
+    v.players.forEach((p) => {
+      p.handCount = total(p.hand);
+      p.devCount = p.dev.length;
+      p.vp = points(s, p.id, p.id === pid);
+      if (p.id !== pid) {
+        delete p.hand;
+        delete p.dev;
+      }
+    });
+    if (v.phase === 'ended') {
+      v.players.forEach((p, i) => { p.vp = points(s, i, true); });
+    }
+    return v;
+  }
+
+  return {
+    RES, RES_FR, DEV_FR, TERRAIN_RES, COST, LIMITS, WIN_POINTS,
+    newGame, boardFromSeed, apply, available, targetsFor, actors, viewFor,
+    points, total, longestRoadOf, tradeRatios,
+    legalSettlements, legalCities, legalRoads,
+  };
+});
+
+</script>
+<script>
+// Salon sur un courtier MQTT public (WebSocket), pour un site hors artefact.
+// Même interface que la capacité `room` des artefacts : emit, on, presence, peers, onPeers, leave.
+// Les courtiers publics ne sont pas fiables pour le secret : tout ce qui circule est déjà chiffré par net.js.
+//
+//  colons-v1/<code>/e/<sujet>   événements   {p: pair, d: données}
+//  colons-v1/<code>/p/<pair>    présence     {t: horloge, v: objet}, retenue ; effacée par le testament à la déconnexion
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.MqttRoom = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const BROKERS = [
+    'wss://broker.emqx.io:8084/mqtt',
+    'wss://broker.hivemq.com:8884/mqtt',
+    'wss://test.mosquitto.org:8081',
+  ];
+  const PREFIX = 'colons-v1';
+  const KEEPALIVE = 30;
+  const STALE_MS = 60000;
+
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+
+  // ---------- Paquets MQTT 3.1.1 ----------
+  function concat(...parts) {
+    const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    let o = 0;
+    parts.forEach((p) => { out.set(p, o); o += p.length; });
+    return out;
+  }
+  function str(s) {
+    const b = enc.encode(s);
+    return concat(Uint8Array.of(b.length >> 8, b.length & 255), b);
+  }
+  function varint(n) {
+    const out = [];
+    do {
+      let d = n % 128;
+      n = Math.floor(n / 128);
+      if (n > 0) d |= 128;
+      out.push(d);
+    } while (n > 0);
+    return Uint8Array.from(out);
+  }
+  const packet = (header, body) => concat(Uint8Array.of(header), varint(body.length), body);
+  const connectPacket = (clientId, willTopic) => packet(0x10, concat(
+    str('MQTT'), Uint8Array.of(4, 0x02 | 0x04 | 0x20, KEEPALIVE >> 8, KEEPALIVE & 255),
+    str(clientId), str(willTopic), Uint8Array.of(0, 0)));
+  const subscribePacket = (id, filter) => packet(0x82, concat(Uint8Array.of(id >> 8, id & 255), str(filter), Uint8Array.of(0)));
+  const publishPacket = (topic, payload, retain) => packet(0x30 | (retain ? 1 : 0), concat(str(topic), payload));
+  const PING = Uint8Array.of(0xc0, 0);
+
+  // Lecteur de flux : les paquets peuvent arriver coupés ou groupés.
+  class Reader {
+    constructor() { this.buf = new Uint8Array(0); }
+    push(bytes) {
+      this.buf = concat(this.buf, bytes);
+      const out = [];
+      for (;;) {
+        if (this.buf.length < 2) break;
+        let len = 0, mult = 1, i = 1, b;
+        do {
+          if (i >= this.buf.length) return out;
+          b = this.buf[i++];
+          len += (b & 127) * mult;
+          mult *= 128;
+        } while (b & 128);
+        if (this.buf.length < i + len) break;
+        out.push({ type: this.buf[0] >> 4, flags: this.buf[0] & 15, body: this.buf.slice(i, i + len) });
+        this.buf = this.buf.slice(i + len);
+      }
+      return out;
+    }
+  }
+  function parsePublish(p) {
+    const tl = (p.body[0] << 8) | p.body[1];
+    const topic = dec.decode(p.body.slice(2, 2 + tl));
+    const qos = (p.flags >> 1) & 3;
+    const start = 2 + tl + (qos ? 2 : 0);
+    return { topic, retain: !!(p.flags & 1), payload: p.body.slice(start) };
+  }
+
+  // ---------- Connexion à un courtier ----------
+  function openSocket(url, clientId, willTopic, WS) {
+    return new Promise((resolve, reject) => {
+      let ws;
+      try { ws = new WS(url, 'mqtt'); } catch (e) { reject(e); return; }
+      ws.binaryType = 'arraybuffer';
+      const reader = new Reader();
+      let done = false;
+      const timer = setTimeout(() => fail(new Error('délai dépassé')), 7000);
+      function fail(e) { if (done) return; done = true; clearTimeout(timer); try { ws.close(); } catch (x) { /* ignore */ } reject(e); }
+      ws.onopen = () => ws.send(connectPacket(clientId, willTopic));
+      ws.onerror = () => fail(new Error('connexion refusée'));
+      ws.onclose = () => fail(new Error('connexion fermée'));
+      ws.onmessage = (ev) => {
+        const pk = reader.push(new Uint8Array(ev.data));
+        for (const p of pk) {
+          if (p.type === 2 && !done) {
+            if (p.body[1] !== 0) { fail(new Error('refusé par le courtier')); return; }
+            done = true;
+            clearTimeout(timer);
+            ws.onerror = ws.onclose = ws.onmessage = null;
+            resolve({ ws, reader, pending: pk.slice(pk.indexOf(p) + 1) });
+            return;
+          }
+        }
+      };
+    });
+  }
+
+  // ---------- Salon ----------
+  async function join(code, opts) {
+    const o = opts || {};
+    const WS = o.WebSocket || (typeof WebSocket !== 'undefined' ? WebSocket : null);
+    if (!WS) throw new Error('WebSocket indisponible');
+    const brokers = o.brokers || BROKERS;
+    const room = String(code).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const base = PREFIX + '/' + room;
+    const peerId = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => (b % 36).toString(36)).join('');
+    const willTopic = base + '/p/' + peerId;
+
+    let ws = null, up = false, closed = false, brokerIndex = 0, subId = 1, retry = 0;
+    let presence = {}, presenceTimer = 0, pingTimer = 0, beatTimer = 0, sweepTimer = 0;
+    const topics = new Map();
+    const peerHandlers = new Set();
+    const connHandlers = new Set();
+    const seen = new Map(); // id -> {presence, updatedAt, seenAt}
+    let pending = { joined: new Set(), updated: new Set(), left: new Set() };
+    let flushing = false;
+
+    const now = () => Date.now();
+    const send = (bytes) => { if (up && ws && ws.readyState === 1) ws.send(bytes); };
+
+    const snapshot = () => {
+      const t = now();
+      const list = [{ peer: peerId, isMe: true, sameTab: true, kind: 'viewer', guest: false, by: null, presence: Object.freeze(Object.assign({}, presence)), updatedAt: selfUpdated }];
+      seen.forEach((e, id) => {
+        if (t - e.seenAt < STALE_MS) list.push({ peer: id, isMe: false, sameTab: false, kind: 'viewer', guest: false, by: null, presence: e.presence, updatedAt: e.updatedAt });
+      });
+      return list;
+    };
+    let selfUpdated = now();
+
+    function flush() {
+      if (flushing) return;
+      flushing = true;
+      Promise.resolve().then(() => {
+        flushing = false;
+        const snap = snapshot();
+        const pick = (set) => snap.filter((p) => set.has(p.peer));
+        const change = { peers: snap, joined: pick(pending.joined), updated: pick(pending.updated), left: [...pending.left].map((id) => ({ peer: id })) };
+        pending = { joined: new Set(), updated: new Set(), left: new Set() };
+        peerHandlers.forEach((h) => h(change));
+      });
+    }
+
+    function onPresence(id, payload) {
+      if (id === peerId) return;
+      if (!payload.length) {
+        if (seen.delete(id)) { pending.left.add(id); flush(); }
+        return;
+      }
+      let obj;
+      try { obj = JSON.parse(dec.decode(payload)); } catch (e) { return; }
+      if (!obj || typeof obj.v !== 'object' || obj.v === null) return;
+      const prev = seen.get(id);
+      const changed = !prev || JSON.stringify(prev.presence) !== JSON.stringify(obj.v);
+      seen.set(id, { presence: Object.freeze(obj.v), updatedAt: changed ? now() : prev.updatedAt, seenAt: now() });
+      if (!prev) pending.joined.add(id);
+      else if (changed) pending.updated.add(id);
+      else return;
+      flush();
+    }
+    function onEvent(topic, payload) {
+      let obj;
+      try { obj = JSON.parse(dec.decode(payload)); } catch (e) { return; }
+      if (!obj || typeof obj.p !== 'string') return;
+      const hs = topics.get(topic);
+      if (!hs) return;
+      const msg = { topic, data: obj.d, peer: obj.p, by: null, isMe: obj.p === peerId, sameTab: obj.p === peerId, kind: 'viewer', guest: false };
+      hs.forEach((h) => h(msg));
+    }
+    function onPacket(p) {
+      if (p.type !== 3) return;
+      const m = parsePublish(p);
+      if (!m.topic.startsWith(base + '/')) return;
+      const rel = m.topic.slice(base.length + 1);
+      if (rel.startsWith('p/')) onPresence(rel.slice(2), m.payload);
+      else if (rel.startsWith('e/')) onEvent(rel.slice(2), m.payload);
+    }
+
+    function publishPresence() {
+      send(publishPacket(willTopic, enc.encode(JSON.stringify({ t: now(), v: presence })), true));
+    }
+
+    async function connect() {
+      let lastErr = null;
+      for (let k = 0; k < brokers.length; k++) {
+        const i = (brokerIndex + k) % brokers.length;
+        try {
+          const c = await openSocket(brokers[i], peerId, willTopic, WS);
+          brokerIndex = i;
+          ws = c.ws;
+          up = true;
+          retry = 0;
+          const reader = c.reader;
+          ws.onmessage = (ev) => reader.push(new Uint8Array(ev.data)).forEach(onPacket);
+          c.pending.forEach(onPacket);
+          ws.onclose = () => { up = false; connHandlers.forEach((h) => h(false)); if (!closed) reconnect(); };
+          ws.onerror = () => {};
+          send(subscribePacket(subId++, base + '/#'));
+          publishPresence();
+          clearInterval(pingTimer);
+          pingTimer = setInterval(() => send(PING), (KEEPALIVE * 1000) / 2);
+          connHandlers.forEach((h) => h(true));
+          return;
+        } catch (e) { lastErr = e; }
+      }
+      throw lastErr || new Error('aucun courtier joignable');
+    }
+    function reconnect() {
+      if (closed) return;
+      const wait = Math.min(10000, 800 * 2 ** retry++);
+      setTimeout(() => { if (!closed) connect().catch(reconnect); }, wait);
+    }
+
+    await connect();
+
+    beatTimer = setInterval(() => publishPresence(), 15000);
+    sweepTimer = setInterval(() => {
+      const t = now();
+      seen.forEach((e, id) => { if (t - e.seenAt >= STALE_MS) { seen.delete(id); pending.left.add(id); } });
+      if (pending.left.size) flush();
+    }, 10000);
+
+    return {
+      name: room,
+      peerId,
+      broker: () => brokers[brokerIndex],
+      connected: () => up,
+      onConnection(h) { connHandlers.add(h); Promise.resolve().then(() => h(up)); return () => connHandlers.delete(h); },
+      async emit(topic, data) {
+        if (!up) return;
+        send(publishPacket(base + '/e/' + topic, enc.encode(JSON.stringify({ p: peerId, d: data })), false));
+      },
+      on(topic, handler) {
+        if (!topics.has(topic)) topics.set(topic, new Set());
+        topics.get(topic).add(handler);
+        return () => topics.get(topic).delete(handler);
+      },
+      async presence(patch) {
+        Object.keys(patch).forEach((k) => { if (patch[k] === null) delete presence[k]; else presence[k] = patch[k]; });
+        selfUpdated = now();
+        clearTimeout(presenceTimer);
+        presenceTimer = setTimeout(publishPresence, 40);
+        pending.updated.add(peerId);
+        flush();
+      },
+      peers: snapshot,
+      onPeers(h) {
+        peerHandlers.add(h);
+        Promise.resolve().then(() => h({ peers: snapshot(), joined: snapshot(), updated: [], left: [] }));
+        return () => peerHandlers.delete(h);
+      },
+      async leave() {
+        if (closed) return;
+        closed = true;
+        clearInterval(pingTimer); clearInterval(beatTimer); clearInterval(sweepTimer); clearTimeout(presenceTimer);
+        send(publishPacket(willTopic, new Uint8Array(0), true));
+        try { send(Uint8Array.of(0xe0, 0)); ws.close(); } catch (e) { /* ignore */ }
+      },
+      // Pour les tests : coupe la liaison sans prévenir, comme un onglet fermé.
+      _drop() { closed = true; clearInterval(pingTimer); clearInterval(beatTimer); clearInterval(sweepTimer); try { ws.close(); } catch (e) { /* ignore */ } },
+    };
+  }
+
+  return { join, BROKERS, _internal: { Reader, connectPacket, subscribePacket, publishPacket, parsePublish } };
+});
+
+</script>
+<script>
+// Transport entre l'écran (hôte) et les téléphones. Aucun accès au DOM ni aux règles.
+//
+// Le canal `room` est entendu par tous les participants. Pour que les mains restent privées :
+//  - chaque appareil a une identité ECDH (P-256) ; sa clé publique voyage dans sa présence,
+//    que la plateforme estampille : personne ne peut la publier à la place d'un autre ;
+//  - hôte et téléphone en dérivent une clé AES-GCM commune ; tout message de jeu est chiffré ;
+//  - la plateforme limite un message à 4 Kio : les messages sont découpés en morceaux.
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.Net = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const TOPIC_ACT = 'a';   // téléphone -> hôte
+  const TOPIC_VIEW = 'v';  // hôte -> téléphone
+  const CHUNK = 2800;
+  const EC = { name: 'ECDH', namedCurve: 'P-256' };
+
+  const subtle = () => (typeof crypto !== 'undefined' && crypto.subtle) || null;
+  const available = () => !!subtle();
+
+  function b64(buf) {
+    const u = new Uint8Array(buf);
+    let s = '';
+    for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]);
+    return btoa(s);
+  }
+  const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const fp = (pub) => pub.slice(6, 14);
+  const randomId = () => b64(crypto.getRandomValues(new Uint8Array(6))).replace(/[^A-Za-z0-9]/g, 'x');
+
+  // ---------- Cryptographie ----------
+  async function newIdentity() {
+    const kp = await subtle().generateKey(EC, true, ['deriveKey']);
+    return {
+      pub: b64(await subtle().exportKey('raw', kp.publicKey)),
+      jwk: await subtle().exportKey('jwk', kp.privateKey),
+      priv: kp.privateKey,
+    };
+  }
+  async function restoreIdentity(saved) {
+    const priv = await subtle().importKey('jwk', saved.jwk, EC, false, ['deriveKey']);
+    return { pub: saved.pub, jwk: saved.jwk, priv };
+  }
+  async function deriveKey(priv, theirPub) {
+    const pub = await subtle().importKey('raw', unb64(theirPub), EC, false, []);
+    return subtle().deriveKey({ name: 'ECDH', public: pub }, priv, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  }
+  async function seal(key, obj) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await subtle().encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(JSON.stringify(obj))));
+    const out = new Uint8Array(12 + ct.length);
+    out.set(iv);
+    out.set(ct, 12);
+    return b64(out);
+  }
+  async function open(key, text) {
+    const u = unb64(text);
+    const pt = await subtle().decrypt({ name: 'AES-GCM', iv: u.slice(0, 12) }, key, u.slice(12));
+    return JSON.parse(new TextDecoder().decode(pt));
+  }
+
+  // ---------- Découpage ----------
+  async function emitSealed(room, topic, key, obj, to) {
+    const str = await seal(key, obj);
+    const m = randomId();
+    const n = Math.max(1, Math.ceil(str.length / CHUNK));
+    for (let i = 0; i < n; i++) await room.emit(topic, { m, i, n, to, d: str.slice(i * CHUNK, (i + 1) * CHUNK) });
+  }
+
+  class Assembler {
+    constructor() { this.parts = new Map(); }
+    push(peer, data) {
+      if (!data || typeof data.d !== 'string' || !Number.isInteger(data.i) || !Number.isInteger(data.n) || data.n < 1 || data.n > 64 || data.i < 0 || data.i >= data.n) return null;
+      const now = Date.now();
+      for (const [k, v] of this.parts) if (now - v.t > 30000) this.parts.delete(k);
+      const k = peer + ':' + data.m;
+      let e = this.parts.get(k);
+      if (!e) { e = { t: now, n: data.n, got: new Map() }; this.parts.set(k, e); }
+      e.got.set(data.i, data.d);
+      if (e.got.size < e.n) return null;
+      this.parts.delete(k);
+      let s = '';
+      for (let i = 0; i < e.n; i++) s += e.got.get(i);
+      return s;
+    }
+  }
+
+  const playersOf = (room) => room.peers().filter((p) => !p.isMe && p.presence && p.presence.r === 'p' && typeof p.presence.pub === 'string');
+
+  // ---------- Hôte (l'écran du plateau) ----------
+  // opts : room, identity, viewOf(seat) -> JSON, onAct(seat, action) -> message d'erreur | null, onLobby()
+  function createHost(opts) {
+    const room = opts.room;
+    const keys = new Map();
+    const lastN = new Map();
+    const lastSent = new Map();
+    const asm = new Assembler();
+    let seats = Object.assign({}, opts.seats || {});
+    let version = opts.version || 0;
+    let status = 'lobby';
+    const seen = [];
+    const noteSeen = () => playersOf(room).forEach((p) => { if (!seen.includes(p.presence.pub)) seen.push(p.presence.pub); });
+    let chain = Promise.resolve();
+    const q = (fn) => { chain = chain.then(fn).catch(() => {}); return chain; };
+
+    room.presence({ r: 'h', pub: opts.identity.pub, v: version, st: status });
+
+    const keyFor = (pub) => {
+      if (!keys.has(pub)) keys.set(pub, deriveKey(opts.identity.priv, pub));
+      return keys.get(pub);
+    };
+    async function toPeer(peer, payload) {
+      const pub = peer.presence.pub;
+      await emitSealed(room, TOPIC_VIEW, await keyFor(pub), payload, fp(pub));
+    }
+    async function sendView(peer) {
+      const seat = seats[peer.presence.pub];
+      lastSent.set(peer.peer, Date.now());
+      if (seat === undefined) {
+        if (status === 'play') await toPeer(peer, { k: 'full' });
+        else await toPeer(peer, { k: 'wait', n: playersOf(room).length });
+        return;
+      }
+      await toPeer(peer, { k: 'view', v: version, seat, view: opts.viewOf(seat) });
+    }
+
+    const offPeers = room.onPeers((ch) => {
+      noteSeen();
+      if (opts.onLobby) opts.onLobby();
+      const fresh = new Set(ch.joined.map((p) => p.peer));
+      [...ch.joined, ...ch.updated].forEach((p) => {
+        if (p.isMe || !p.presence || p.presence.r !== 'p' || typeof p.presence.pub !== 'string') return;
+        const stale = p.presence.v !== version && Date.now() - (lastSent.get(p.peer) || 0) > 1500;
+        if (fresh.has(p.peer) || stale) q(() => sendView(p));
+      });
+    });
+
+    // Filet de sécurité : un message perdu n'est pas rejoué. Tout téléphone en retard sur la version reçoit sa vue à nouveau.
+    const resync = setInterval(() => {
+      playersOf(room).forEach((p) => {
+        if (Date.now() - (lastSent.get(p.peer) || 0) < 2500) return;
+        const behind = seats[p.presence.pub] !== undefined ? p.presence.v !== version : status === 'play' || p.presence.v !== -1;
+        if (behind) q(() => sendView(p));
+      });
+    }, 3000);
+    if (resync.unref) resync.unref();
+
+    const offAct = room.on(TOPIC_ACT, (msg) => {
+      if (msg.isMe) return;
+      const peer = room.peers().find((p) => p.peer === msg.peer);
+      if (!peer || !peer.presence || peer.presence.r !== 'p' || typeof peer.presence.pub !== 'string') return;
+      const pub = peer.presence.pub;
+      if (seats[pub] === undefined) return;
+      const text = asm.push(msg.peer, msg.data);
+      if (!text) return;
+      q(async () => {
+        let payload;
+        try { payload = await open(await keyFor(pub), text); } catch (e) { return; }
+        if (!payload || !(payload.n > (lastN.get(pub) || 0)) || !payload.action) return;
+        lastN.set(pub, payload.n);
+        const err = opts.onAct(seats[pub], payload.action);
+        if (err) await toPeer(peer, { k: 'err', n: payload.n, error: err });
+      });
+    });
+
+    return {
+      setSeats(map) { seats = Object.assign({}, map); },
+      seats: () => Object.assign({}, seats),
+      // Ceux qui sont là maintenant, dans l'ordre d'arrivée.
+      lobby: () => (noteSeen(), playersOf(room)
+        .slice()
+        .sort((a, b) => seen.indexOf(a.presence.pub) - seen.indexOf(b.presence.pub))
+        .map((p) => ({ peer: p.peer, pub: p.presence.pub, name: String(p.presence.name || 'Joueur').slice(0, 14), seat: seats[p.presence.pub] }))),
+      setStatus(st) {
+        status = st;
+        room.presence({ st });
+        playersOf(room).forEach((p) => q(() => sendView(p)));
+      },
+      publish() {
+        version++;
+        room.presence({ v: version });
+        playersOf(room).forEach((p) => { if (seats[p.presence.pub] !== undefined) q(() => sendView(p)); });
+      },
+      version: () => version,
+      close() { clearInterval(resync); offPeers(); offAct(); room.presence({ r: null, pub: null, v: null, st: null }); },
+    };
+  }
+
+  // ---------- Client (le téléphone) ----------
+  // opts : room, identity, name, onView(payload), onStatus(status, info), onError(text)
+  function createClient(opts) {
+    const room = opts.room;
+    const asm = new Assembler();
+    let hostKey = null, hostPeer = null, hostPub = null, lastV = -1, counter = Date.now();
+    let status = '';
+    const set = (s, info) => { if (s !== status || info) { status = s; opts.onStatus(s, info || {}); } };
+
+    room.presence({ r: 'p', name: opts.name, pub: opts.identity.pub, v: -1 });
+    set('searching');
+
+    function scan() {
+      const host = room.peers().find((p) => !p.isMe && p.presence && p.presence.r === 'h' && typeof p.presence.pub === 'string');
+      if (!host) {
+        if (hostPeer) { hostPeer = null; hostKey = null; hostPub = null; }
+        set('searching');
+        return;
+      }
+      if (host.peer !== hostPeer || host.presence.pub !== hostPub) {
+        hostPeer = host.peer;
+        if (host.presence.pub !== hostPub) { hostPub = host.presence.pub; lastV = -1; hostKey = null; }
+        deriveKey(opts.identity.priv, hostPub).then((k) => { hostKey = k; }).catch(() => {});
+        room.presence({ v: -1 });
+        set('found');
+      }
+    }
+    // Écran trouvé mais rien reçu : on relance la demande (un changement de présence réveille l'hôte).
+    let nudge = 0;
+    const nudger = setInterval(() => { if (status === 'found') room.presence({ n: ++nudge }); }, 3000);
+    if (nudger.unref) nudger.unref();
+
+    const offPeers = room.onPeers(() => { scan(); if (opts.onLobby) opts.onLobby(playersOf(room).concat(room.peers().filter((p) => p.isMe)).map((p) => String(p.presence.name || 'Joueur').slice(0, 14))); });
+    scan();
+
+    const offView = room.on(TOPIC_VIEW, (msg) => {
+      if (msg.isMe || msg.peer !== hostPeer || !msg.data || msg.data.to !== fp(opts.identity.pub)) return;
+      const text = asm.push(msg.peer, msg.data);
+      if (!text) return;
+      const tryOpen = async () => {
+        for (let i = 0; i < 20 && !hostKey; i++) await new Promise((r) => setTimeout(r, 50));
+        if (!hostKey) return;
+        let p;
+        try { p = await open(hostKey, text); } catch (e) { return; }
+        if (!p) return;
+        if (p.k === 'view') {
+          if (p.v < lastV) return;
+          lastV = p.v;
+          room.presence({ v: p.v });
+          set('playing');
+          opts.onView(p);
+        } else if (p.k === 'wait') set('lobby', { count: p.n });
+        else if (p.k === 'full') set('full');
+        else if (p.k === 'err') opts.onError(p.error, p.n);
+      };
+      tryOpen();
+    });
+
+    return {
+      async send(action) {
+        if (!hostKey) throw new Error('hors ligne');
+        const n = ++counter;
+        await emitSealed(room, TOPIC_ACT, hostKey, { n, action }, fp(hostPub || ''));
+        return n;
+      },
+      status: () => status,
+      close() { clearInterval(nudger); offPeers(); offView(); room.presence({ r: null, pub: null, name: null, v: null, n: null }); },
+    };
+  }
+
+  return { available, newIdentity, restoreIdentity, createHost, createClient, seal, open, deriveKey, emitSealed, Assembler, fp };
+});
+
+</script>
+<script>
+// Interface. Aucune règle ici : tout vient de Engine.available / targetsFor / apply.
+// Trois modes : « local » (un seul écran), « host » (écran du plateau) et « client » (téléphone).
+(function () {
+  'use strict';
+  const E = window.Engine;
+  const N = window.Net;
+  const RES = E.RES;
+  const ARTIFACT_URL = 'https://claude.ai/artifact/5joQ3H2dnKkyBn6zjJ5NMj';
+  const NAME = { wood: 'Bois', brick: 'Argile', sheep: 'Laine', wheat: 'Blé', ore: 'Minerai' };
+  const COLOR_VAR = ['--p-red', '--p-blue', '--p-orange', '--p-white'];
+  const COLOR_FR = ['rouge', 'bleu', 'orange', 'blanc'];
+  const GLYPH = { forest: 'wood', hills: 'brick', pasture: 'sheep', fields: 'wheat', mountains: 'ore', desert: 'desert' };
+  const DEV_HELP = {
+    knight: 'Déplace le voleur et vole une carte.',
+    vp: 'Compte 1 point, reste caché.',
+    roadBuilding: 'Pose 2 routes gratuites.',
+    yearOfPlenty: 'Prends 2 cartes de ton choix à la banque.',
+    monopoly: 'Tous les autres te donnent une ressource choisie.',
+  };
+  const SAVE_KEY = 'colons-de-lile-v1';
+  const HOST_KEY = 'colons-de-lile-host-v1';
+  const CLIENT_KEY = 'colons-de-lile-client-v1';
+  const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const S = 100;
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const zero = () => ({ wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 });
+  const sum = (b) => RES.reduce((n, r) => n + b[r], 0);
+  const icon = (r, cls) => '<svg class="' + (cls || 'ico') + '" aria-hidden="true"><use href="#g-' + r + '"/></svg>';
+  const bundle = (b) => '<span class="bundle">' + RES.filter((r) => b[r]).map((r) => b[r] + icon(r, 'mini')).join(' ') + '</span>';
+  const costIcons = (c) => RES.filter((r) => c[r]).map((r) => icon(r, 'mini').repeat(c[r])).join('');
+  const pcolor = (i) => 'var(' + COLOR_VAR[i] + ')';
+  const cardsOf = (p) => (p.hand ? E.total(p.hand) : p.handCount);
+  const devOf = (p) => (p.dev ? p.dev.length : p.devCount);
+  const deckOf = (s) => (s.devDeck ? s.devDeck.length : s.devDeckCount);
+  const finalPts = (s, i) => (s.players[i].dev ? E.points(s, i, true) : s.players[i].vp);
+
+  let mode = 'menu';       // menu | local | host | client
+  let game = null;         // état complet (local, host) ou vue du joueur + plateau (client)
+  let hostNet = null, clientNet = null, activeRoom = null;
+  const ui = {
+    screen: 'menu', pin: null, mode: null, tradeOpen: false, tab: 'bank', bankGive: null, bankGet: null,
+    give: zero(), want: zero(), discard: zero(), pick: null, yop: [], toast: '', confirmNew: false,
+    count: 3, names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: '', lastTurn: -1,
+    code: '', joinCode: '', myName: '', error: '', busy: false,
+    seat: -1, boardSeed: null, board: null, conn: 'searching', lobby: [], pending: 0, phoneTab: 'hand', needBoard: false, wasNeed: false, wasMine: false,
+  };
+  let toastTimer = 0;
+
+  // ---------- Stockage local ----------
+  const store = {
+    get(k) { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : null; } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* stockage indisponible */ } },
+    del(k) { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } },
+  };
+  const slim = (g) => Object.assign({}, g, { board: undefined });
+  const fat = (g) => { if (g && !g.board) g.board = E.boardFromSeed(g.seed); return g; };
+  const validGame = (g) => g && g.players && (g.board || g.seed != null);
+  function save() {
+    if (mode === 'local') store.set(SAVE_KEY, slim(game));
+    else if (mode === 'host') store.set(HOST_KEY, { game: slim(game), seats: hostNet.seats(), code: ui.code });
+  }
+
+  // ---------- Actions ----------
+  function dispatch(action) {
+    if (mode === 'client') return sendFromPhone(action);
+    const r = E.apply(game, action);
+    if (!r.ok) { say(r.error); return false; }
+    game = r.state;
+    afterAction(action);
+    save();
+    render();
+    return true;
+  }
+  function afterAction(action) {
+    ui.mode = null;
+    ui.pick = null;
+    ui.yop = [];
+    ui.discard = zero();
+    if (action.type === 'bankTrade') { ui.bankGive = null; ui.bankGet = null; }
+    else if (action.type === 'offerTrade') { ui.give = zero(); ui.want = zero(); }
+    else if (!/Trade$/.test(action.type)) ui.tradeOpen = false;
+  }
+  function say(msg) {
+    ui.toast = msg;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { ui.toast = ''; renderHand(); }, 3500);
+    renderHand();
+  }
+  function sendFromPhone(action) {
+    if (!clientNet || !game) return false;
+    const id = ++ui.pending;
+    afterAction(action);
+    clientNet.send(Object.assign({}, action, { player: ui.seat })).catch(() => { ui.pending = 0; say('Écran hors ligne.'); });
+    setTimeout(() => { if (ui.pending === id) { ui.pending = 0; say('L\'écran n\'a pas répondu, réessaie.'); } }, 5000);
+    render();
+    return true;
+  }
+
+  const myPid = () => (mode === 'client' ? ui.seat : game.turn);
+  function viewer() {
+    if (mode === 'client') return ui.seat;
+    if (ui.pin != null && ui.pin < game.players.length) return ui.pin;
+    const a = E.actors(game);
+    return a.length ? a[0] : game.turn;
+  }
+
+  // ---------- Plateau ----------
+  const X = (v) => Math.round(v * S * 10) / 10;
+
+  function boardHTML() {
+    const s = game, b = s.board;
+    const pid = myPid();
+    const av = E.available(s, pid);
+    let tg = av.targets;
+    if (ui.mode && av.myTurn) tg = Object.assign({ vertices: [], edges: [], hexes: [] }, E.targetsFor(s, pid, ui.mode));
+    tg = Object.assign({ vertices: [], edges: [], hexes: [] }, tg);
+    ui.needBoard = !!(tg.vertices.length || tg.edges.length || tg.hexes.length);
+    const out = [];
+    out.push('<ellipse cx="0" cy="0" rx="530" ry="490" fill="var(--sea)" stroke="var(--sea-edge)" stroke-width="6"/><ellipse cx="0" cy="0" rx="530" ry="490" fill="url(#waves)"/><ellipse cx="0" cy="0" rx="530" ry="490" fill="url(#seagrad)"/>');
+
+    b.ports.forEach((p) => {
+      const bx = X(p.x + p.nx * 0.62), by = X(p.y + p.ny * 0.62);
+      [p.a, p.b].forEach((v) => {
+        out.push('<line x1="' + bx + '" y1="' + by + '" x2="' + X(b.vertices[v].x) + '" y2="' + X(b.vertices[v].y) + '" stroke="var(--pier)" stroke-width="7" stroke-linecap="round"/>');
+      });
+      const generic = p.type === 'any';
+      out.push('<g transform="translate(' + bx + ' ' + by + ')"><circle r="29" fill="var(--surface)" stroke="var(--pier)" stroke-width="4"/>' +
+        (generic
+          ? '<text y="7" text-anchor="middle" font-size="19" font-weight="800" fill="var(--ink)" font-family="var(--f-display)">3:1</text>'
+          : '<use href="#g-' + p.type + '" x="-13" y="-25" width="26" height="26"/><text y="20" text-anchor="middle" font-size="14" font-weight="800" fill="var(--ink)" font-family="var(--f-display)">2:1</text>') +
+        '</g>');
+    });
+
+    b.hexes.forEach((h) => {
+      const pts = h.vertices.map((v) => X(b.vertices[v].x) + ',' + X(b.vertices[v].y)).join(' ');
+      const cx = X(h.x), cy = X(h.y);
+      const g = GLYPH[h.terrain];
+      const flip = (h.id * 7 + h.q * 3 + h.r) % 2 ? ' scale(-1 1)' : '';
+      out.push('<g transform="translate(' + cx + ' ' + cy + ')"><g clip-path="url(#hexclip)"><g transform="scale(1)' + flip + '"><use href="#t-' + h.terrain + '"/></g><rect x="-100" y="-100" width="200" height="200" fill="url(#hexshade)"/></g>' +
+        '<polygon points="86.6,-50 86.6,50 0,100 -86.6,50 -86.6,-50 0,-100" transform="scale(.94)" fill="none" stroke="#1b2a30" stroke-opacity=".18" stroke-width="2.4" stroke-linejoin="round"/></g>');
+      out.push('<polygon points="' + pts + '" fill="none" stroke="#fffaf0" stroke-width="5.5" stroke-linejoin="round"/>');
+      if (h.number) {
+        out.push('<circle cx="' + cx + '" cy="' + (cy - 46) + '" r="21" fill="#fffaf0" fill-opacity=".92"/><use href="#g-' + g + '" x="' + (cx - 18) + '" y="' + (cy - 64) + '" width="36" height="36"/>');
+        const hot = h.number === 6 || h.number === 8;
+        const pips = 6 - Math.abs(7 - h.number);
+        out.push('<g transform="translate(' + cx + ' ' + (cy + 20) + ')"><circle cx="2" cy="3" r="30" fill="#1b2a30" fill-opacity=".28"/><circle r="30" fill="url(#tokengrad)" stroke="#1b1b1b" stroke-opacity=".3" stroke-width="2"/>' +
+          '<text y="5" text-anchor="middle" font-size="28" font-weight="800" font-family="var(--f-display)" fill="' + (hot ? '#c2281a' : '#1b1b1b') + '">' + h.number + '</text>' +
+          '<g fill="' + (hot ? '#c2281a' : '#1b1b1b') + '">' +
+          Array.from({ length: pips }, (_, i) => '<circle cx="' + ((i - (pips - 1) / 2) * 6.4) + '" cy="17" r="2.3"/>').join('') +
+          '</g></g>');
+      } else {
+        out.push('<circle cx="' + cx + '" cy="' + (cy - 4) + '" r="26" fill="#fffaf0" fill-opacity=".9"/><use href="#g-' + g + '" x="' + (cx - 22) + '" y="' + (cy - 26) + '" width="44" height="44"/>');
+      }
+    });
+
+    Object.keys(s.roads).forEach((k) => {
+      const e = b.edges[+k], A = b.vertices[e.a], B = b.vertices[e.b];
+      const ax = X(A.x + (B.x - A.x) * 0.14), ay = X(A.y + (B.y - A.y) * 0.14);
+      const bx = X(A.x + (B.x - A.x) * 0.86), by = X(A.y + (B.y - A.y) * 0.86);
+      out.push('<line x1="' + ax + '" y1="' + ay + '" x2="' + bx + '" y2="' + by + '" stroke="#1b1b1b" stroke-width="15" stroke-linecap="round"/>');
+      out.push('<line x1="' + ax + '" y1="' + ay + '" x2="' + bx + '" y2="' + by + '" stroke="' + pcolor(s.roads[k]) + '" stroke-width="9" stroke-linecap="round"/>');
+    });
+
+    tg.hexes.forEach((id) => {
+      const h = b.hexes[id];
+      const pts = h.vertices.map((v) => X(b.vertices[v].x) + ',' + X(b.vertices[v].y)).join(' ');
+      out.push('<polygon class="tgt-h" data-h="' + id + '" points="' + pts + '"/>');
+    });
+    tg.edges.forEach((id) => {
+      const e = b.edges[id], A = b.vertices[e.a], B = b.vertices[e.b];
+      out.push('<line class="tgt-e" data-e="' + id + '" x1="' + X(A.x + (B.x - A.x) * 0.16) + '" y1="' + X(A.y + (B.y - A.y) * 0.16) + '" x2="' + X(A.x + (B.x - A.x) * 0.84) + '" y2="' + X(A.y + (B.y - A.y) * 0.84) + '"/>');
+    });
+
+    Object.keys(s.buildings).forEach((k) => {
+      const v = b.vertices[+k], bd = s.buildings[k];
+      const d = bd.type === 'city'
+        ? 'M-15 10V-2H-6V-12L2-19 10-12V-2H15V10Z'
+        : 'M-11 10V-2L0-13 11-2V10Z';
+      out.push('<g transform="translate(' + X(v.x) + ' ' + X(v.y) + ') scale(1.25)"><path class="piece" d="' + d + '" fill="' + pcolor(bd.owner) + '"/></g>');
+    });
+
+    tg.vertices.forEach((id) => {
+      const v = b.vertices[id];
+      out.push('<circle class="tgt" data-v="' + id + '" cx="' + X(v.x) + '" cy="' + X(v.y) + '" r="17"/>');
+    });
+
+    const rh = b.hexes[s.robber];
+    out.push('<g transform="translate(' + (X(rh.x) + 44) + ' ' + (X(rh.y) + 4) + ')" pointer-events="none"><path d="M-14 22Q-14-6 0-9Q14-6 14 22Z" fill="#23262b" stroke="#fffaf0" stroke-width="3"/><circle cy="-22" r="11" fill="#23262b" stroke="#fffaf0" stroke-width="3"/></g>');
+    return out.join('');
+  }
+
+  function bannerHTML() {
+    const s = game;
+    const who = s.players[s.turn];
+    let txt;
+    if (mode === 'client') {
+      txt = hintText(s, ui.seat, E.available(s, ui.seat)).t;
+    } else if (s.phase === 'ended') txt = who.name + ' a gagné';
+    else if (s.phase === 'setup') txt = who.name + ' · ' + (s.step === 'settlement' ? 'pose une colonie' : 'pose une route');
+    else {
+      const map = { roll: 'lance les dés', discard: 'attend les défausses', robber: 'déplace le voleur', steal: 'choisit qui voler', actions: 'joue son tour', roadBuilding: 'pose ses routes' };
+      txt = who.name + ' · ' + (map[s.step] || '');
+    }
+    let dice = '';
+    if (s.dice) {
+      const key = s.turnNo + ':' + s.dice.join(',');
+      const fresh = key !== ui.diceKey;
+      ui.diceKey = key;
+      dice = '<div class="dice' + (fresh ? ' rolled' : '') + '" aria-label="Dés"><span class="die">' + s.dice[0] + '</span><span class="die">' + s.dice[1] + '</span><span class="sum">' + (s.dice[0] + s.dice[1]) + '</span></div>';
+    }
+    const cancel = mode === 'client' && ui.mode ? '<button class="btn small" data-act="mode" data-k="' + ui.mode + '">Annuler</button>' : '';
+    return '<div class="say"><span class="dot" style="--pc:' + pcolor(s.turn) + '"></span>' + esc(txt) + '</div>' + cancel + dice;
+  }
+
+  // ---------- Scores ----------
+  function onlineSeats() {
+    const on = new Set();
+    if (mode === 'host' && hostNet) hostNet.lobby().forEach((p) => { if (p.seat !== undefined) on.add(p.seat); });
+    return on;
+  }
+  function scoresHTML() {
+    const s = game, v = mode === 'host' ? -1 : viewer();
+    const on = onlineSeats();
+    const rows = s.players.map((p, i) => {
+      const badges = (s.longestRoad.holder === i ? '<span class="badge">Plus longue route</span>' : '') +
+        (s.largestArmy.holder === i ? '<span class="badge">Plus grande armée</span>' : '') +
+        (mode === 'host' && !on.has(i) ? '<span class="badge off">Hors ligne</span>' : '');
+      const tag = mode === 'local' && i === v ? ' <small>(affiché)</small>' : (mode === 'client' && i === v ? ' <small>(toi)</small>' : '');
+      return '<li class="pl' + (i === s.turn && s.phase !== 'ended' ? ' turn' : '') + '" style="--pc:' + pcolor(i) + '">' +
+        '<span class="dot"></span><b>' + esc(p.name) + tag + '</b><span class="pts" title="Points visibles">' + E.points(s, i, false) + '</span>' +
+        '<span class="meta"><span>' + cardsOf(p) + ' cartes</span><span>' + devOf(p) + ' dév.</span><span>' + p.knights + ' chevalier' + (p.knights > 1 ? 's' : '') + '</span><span>route ' + (p.roadLen || 0) + '</span>' + badges + '</span></li>';
+    }).join('');
+    const bank = RES.map((r) => '<span title="' + NAME[r] + '">' + icon(r, 'mini') + s.bank[r] + '</span>').join('');
+    return '<h2>Joueurs · objectif ' + E.WIN_POINTS + ' points</h2><ul class="players">' + rows + '</ul>' +
+      '<div class="bank"><b>Banque</b>' + bank + '<span>cartes dév. ' + deckOf(s) + '</span></div>';
+  }
+
+  // ---------- Main du joueur ----------
+  function hintText(s, v, av) {
+    const turnName = s.players[s.turn].name;
+    if (s.phase === 'ended') return { t: s.players[s.winner].name + ' remporte la partie.', go: false };
+    if (s.phase === 'setup') {
+      if (s.turn !== v) return { t: 'Mise en place : au tour de ' + turnName + '.', go: false };
+      return av.setupSettlement
+        ? { t: 'Pose ta colonie sur un point lumineux du plateau.', go: true }
+        : { t: 'Pose une route à côté de ta colonie.', go: true };
+    }
+    if (s.step === 'discard') {
+      if (av.discard) return { t: 'Un 7 ! Défausse ' + av.discard + ' cartes.', go: true };
+      const who = Object.keys(s.discard).map((k) => s.players[+k].name).join(', ');
+      return { t: 'Un 7 : ' + who + ' défausse.', go: false };
+    }
+    if (s.step === 'robber') return s.turn === v ? { t: 'Déplace le voleur : touche un hexagone.', go: true } : { t: turnName + ' déplace le voleur.', go: false };
+    if (s.step === 'steal') return s.turn === v ? { t: 'Choisis à qui voler une carte.', go: true } : { t: turnName + ' choisit sa victime.', go: false };
+    if (s.step === 'roadBuilding') return s.turn === v ? { t: 'Pose encore ' + s.freeRoads + ' route' + (s.freeRoads > 1 ? 's' : '') + ' gratuite' + (s.freeRoads > 1 ? 's' : '') + '.', go: true } : { t: turnName + ' pose des routes.', go: false };
+    if (s.turn !== v) return { t: 'Au tour de ' + turnName + '.', go: false };
+    if (s.step === 'roll') return { t: 'À toi de jouer : lance les dés.', go: true };
+    if (ui.mode) return { t: 'Touche un emplacement lumineux sur le plateau.', go: true };
+    return { t: s.players[v].name + ', construis, échange ou termine ton tour.', go: false };
+  }
+
+  function tradeHTML(s, v, av) {
+    const t = s.trade;
+    const me = s.players[v];
+    const tab = t && t.from === v ? 'players' : ui.tab;
+    let html = '<div class="sheet"><div class="tabs">' +
+      '<button class="btn" data-act="tab" data-k="bank" aria-pressed="' + (tab === 'bank') + '">Banque</button>' +
+      '<button class="btn" data-act="tab" data-k="players" aria-pressed="' + (tab === 'players') + '">Joueurs</button></div>';
+    if (tab === 'bank') {
+      html += '<div class="section-title">Je donne</div><div class="picks">' + RES.map((r) =>
+        '<button class="pick" data-act="bank-give" data-r="' + r + '" aria-pressed="' + (ui.bankGive === r) + '"' + (me.hand[r] >= av.ratios[r] ? '' : ' disabled') + '>' +
+        icon(r) + av.ratios[r] + ' pour 1<small>' + me.hand[r] + ' en main</small></button>').join('') + '</div>';
+      html += '<div class="section-title">Je reçois</div><div class="picks">' + RES.map((r) =>
+        '<button class="pick" data-act="bank-get" data-r="' + r + '" aria-pressed="' + (ui.bankGet === r) + '"' + (s.bank[r] > 0 && r !== ui.bankGive ? '' : ' disabled') + '>' +
+        icon(r) + NAME[r] + '<small>banque ' + s.bank[r] + '</small></button>').join('') + '</div>';
+      html += '<button class="btn primary" data-act="bank-do"' + (ui.bankGive && ui.bankGet ? '' : ' disabled') + '>Échanger avec la banque</button>';
+    } else if (t && t.from === v) {
+      html += '<div class="offer"><div class="line">Tu proposes ' + bundle(t.give) + ' contre ' + bundle(t.want) + '</div>';
+      s.players.forEach((p) => {
+        if (p.id === v) return;
+        const r = t.responses[p.id];
+        html += '<div class="resp"><span><span class="dot" style="--pc:' + pcolor(p.id) + '"></span> ' + esc(p.name) + '</span>' +
+          (r === true ? '<span class="st yes">Accepte</span><button class="btn small primary" data-act="confirm" data-with="' + p.id + '">Conclure</button>'
+            : r === false ? '<span class="st no">Refuse</span>' : '<span class="st">En attente…</span>') + '</div>';
+      });
+      html += '<button class="btn small" data-act="cancel-offer">Retirer l\'offre</button></div>';
+    } else {
+      const block = (key, title, max) => '<div class="section-title">' + title + '</div><div class="stepper-grid">' + RES.map((r) =>
+        '<div class="stepper">' + icon(r) + '<span class="nm">' + NAME[r] + '</span>' +
+        '<button class="btn" data-act="step" data-set="' + key + '" data-r="' + r + '" data-d="-1" aria-label="Moins de ' + NAME[r] + '"' + (ui[key][r] > 0 ? '' : ' disabled') + '>−</button>' +
+        '<b>' + ui[key][r] + '</b>' +
+        '<button class="btn" data-act="step" data-set="' + key + '" data-r="' + r + '" data-d="1" aria-label="Plus de ' + NAME[r] + '"' + (ui[key][r] < max(r) ? '' : ' disabled') + '>+</button></div>').join('') + '</div>';
+      html += block('give', 'Je donne', (r) => me.hand[r]) + block('want', 'Je demande', () => 9);
+      const ok = sum(ui.give) > 0 && sum(ui.want) > 0 && !RES.some((r) => ui.give[r] > 0 && ui.want[r] > 0);
+      html += '<button class="btn primary" data-act="offer"' + (ok ? '' : ' disabled') + '>Proposer aux autres joueurs</button>';
+    }
+    return html + '</div>';
+  }
+
+  function incomingOffer(s, v) {
+    const t = s.trade;
+    if (!t || t.from === v || s.phase !== 'main') return '';
+    const me = s.players[v];
+    const can = RES.every((r) => me.hand[r] >= t.want[r]);
+    const r = t.responses[v];
+    return '<div class="offer"><div class="line"><span class="dot" style="--pc:' + pcolor(t.from) + '"></span>' + esc(s.players[t.from].name) + ' donne ' + bundle(t.give) + ' contre ' + bundle(t.want) + '</div>' +
+      (r === undefined ? '' : '<div class="resp"><span class="st ' + (r ? 'yes' : 'no') + '">Tu as ' + (r ? 'accepté' : 'refusé') + '</span></div>') +
+      '<div class="row"><button class="btn primary" data-act="respond" data-a="1"' + (can ? '' : ' disabled') + '>Accepter</button><button class="btn" data-act="respond" data-a="0">Refuser</button></div>' +
+      (can ? '' : '<div class="st">Il te manque des cartes pour accepter.</div>') + '</div>';
+  }
+
+  function needsMe(s, v) {
+    if (!s || s.phase === 'ended' || v < 0) return false;
+    const av = E.available(s, v);
+    return !!(av.roll || av.discard || av.setupSettlement || av.setupRoad || av.moveRobber || av.steal || av.freeRoad ||
+      (s.trade && s.trade.from !== v && s.trade.responses[v] === undefined && s.phase === 'main'));
+  }
+
+  function handHTML() {
+    const s = game, v = viewer();
+    const me = s.players[v];
+    const av = E.available(s, v);
+    const hint = hintText(s, v, av);
+    const chips = mode === 'local' ? '<div class="chips" role="group" aria-label="Changer de joueur affiché">' + s.players.map((p, i) => {
+      const alert = (s.step === 'discard' && s.discard[i]) || (s.trade && s.trade.from !== i && s.trade.responses[i] === undefined && s.phase === 'main');
+      return '<button class="chip" data-act="view" data-i="' + i + '" aria-pressed="' + (i === v) + '"><span class="dot" style="--pc:' + pcolor(i) + '"></span>' + esc(p.name) + (alert ? '<span class="alert" title="Doit agir"></span>' : '') + '</button>';
+    }).join('') + '</div>' : '';
+    let html = '<div class="hand-head"><span class="dot" style="--pc:' + pcolor(v) + '"></span><h2>' + (mode === 'client' ? esc(me.name) : 'Main de ' + esc(me.name)) + '</h2>' +
+      (ui.pending ? '<span class="sending" aria-label="Envoi en cours">…</span>' : '') +
+      '<span class="vp">' + E.points(s, v, true) + '<small>pts</small></span></div>' + chips +
+      '<p class="hint' + (hint.go ? ' go' : '') + '" role="status">' + esc(hint.t) + '</p>';
+
+    html += incomingOffer(s, v);
+
+    html += '<div class="tiles" aria-label="Ressources">' + RES.map((r) =>
+      '<div class="tile' + (me.hand[r] ? '' : ' zero') + '">' + icon(r) + '<b>' + me.hand[r] + '</b><span>' + NAME[r] + '</span></div>').join('') + '</div>';
+
+    if (av.roll) html += '<button class="btn primary big" data-act="roll">Lancer les dés</button>';
+    if (av.discard) {
+      const n = sum(ui.discard);
+      html += '<div class="sheet"><div class="section-title">Défausse ' + av.discard + ' cartes (' + n + ' choisies)</div><div class="stepper-grid">' + RES.map((r) =>
+        '<div class="stepper">' + icon(r) + '<span class="nm">' + NAME[r] + '</span>' +
+        '<button class="btn" data-act="step" data-set="discard" data-r="' + r + '" data-d="-1"' + (ui.discard[r] > 0 ? '' : ' disabled') + '>−</button><b>' + ui.discard[r] + '</b>' +
+        '<button class="btn" data-act="step" data-set="discard" data-r="' + r + '" data-d="1"' + (ui.discard[r] < me.hand[r] && n < av.discard ? '' : ' disabled') + '>+</button></div>').join('') +
+        '</div><button class="btn primary" data-act="discard"' + (n === av.discard ? '' : ' disabled') + '>Défausser</button></div>';
+    }
+    if (av.steal) {
+      html += '<div class="row">' + av.steal.map((i) => '<button class="btn" data-act="steal" data-i="' + i + '"><span class="dot" style="--pc:' + pcolor(i) + '"></span>Voler à ' + esc(s.players[i].name) + '</button>').join('') + '</div>';
+    }
+
+    const kinds = {};
+    me.dev.forEach((c) => {
+      const k = kinds[c.k] || (kinds[c.k] = { n: 0, ready: 0 });
+      k.n++;
+      if (c.t < s.turnNo) k.ready++;
+    });
+    const kindKeys = Object.keys(kinds);
+    if (kindKeys.length) {
+      html += '<div class="section-title">Cartes de développement</div><div class="devs">' + kindKeys.map((k) => {
+        const info = kinds[k];
+        const playable = k !== 'vp' && av.dev[k];
+        const note = k === 'vp' ? DEV_HELP.vp : (info.ready < info.n ? 'Achetée ce tour, jouable au prochain. ' : '') + DEV_HELP[k];
+        return '<div class="dev"><span class="cnt">' + info.n + '</span><span class="nm">' + E.DEV_FR[k] + '<small>' + note + '</small></span>' +
+          (k === 'vp' ? '' : '<button class="btn small" data-act="dev" data-k="' + k + '"' + (playable ? '' : ' disabled') + '>Jouer</button>') + '</div>';
+      }).join('') + '</div>';
+    }
+    if (ui.pick === 'yop' || ui.pick === 'mono') {
+      const left = Object.assign({}, s.bank);
+      ui.yop.forEach((r) => { left[r]--; });
+      html += '<div class="sheet"><div class="section-title">' + (ui.pick === 'yop' ? 'Invention : choisis ' + (2 - ui.yop.length) + ' carte(s)' : 'Monopole : quelle ressource ?') + '</div><div class="picks">' +
+        RES.map((r) => '<button class="pick" data-act="pick-res" data-r="' + r + '"' + (ui.pick === 'yop' && left[r] < 1 ? ' disabled' : '') + '>' + icon(r) + NAME[r] + '</button>').join('') +
+        '</div><button class="btn small" data-act="pick-cancel">Annuler</button></div>';
+    }
+
+    if (av.myTurn && s.phase === 'main' && s.step === 'actions') {
+      const b = (k, label, cost, on) => '<button class="btn build" data-act="mode" data-k="' + k + '" aria-pressed="' + (ui.mode === k) + '"' + (on ? '' : ' disabled') + '><span>' + label + '</span><span class="cost">' + costIcons(cost) + '</span></button>';
+      html += '<div class="section-title">Construire</div><div class="builds">' +
+        b('road', 'Route', E.COST.road, av.road) + b('settlement', 'Colonie', E.COST.settlement, av.settlement) +
+        b('city', 'Ville', E.COST.city, av.city) +
+        '<button class="btn build" data-act="buy"' + (av.buyDev ? '' : ' disabled') + '><span>Carte dév.</span><span class="cost">' + costIcons(E.COST.dev) + '</span></button></div>';
+      if (ui.mode) html += '<button class="btn small" data-act="mode" data-k="' + ui.mode + '">Annuler la construction</button>';
+      html += '<button class="btn" data-act="trade-toggle" aria-expanded="' + ui.tradeOpen + '">' + (ui.tradeOpen ? 'Fermer le commerce' : 'Commerce') + '</button>';
+      if (ui.tradeOpen) html += tradeHTML(s, v, av);
+      html += '<button class="btn primary" data-act="end">Terminer mon tour</button>';
+    } else if (s.phase === 'main' && s.trade && s.trade.from === v) {
+      html += tradeHTML(s, v, av);
+    }
+
+    if (ui.toast) html += '<div class="toast" role="alert">' + esc(ui.toast) + '</div>';
+    return html;
+  }
+
+  function logHTML() {
+    const lines = game.log.slice(-60).map((l) => '<li>' + esc(l) + '</li>').join('');
+    return '<h2>Journal</h2><ol>' + lines + '</ol>';
+  }
+
+  function overHTML() {
+    const s = game;
+    if (s.phase !== 'ended') return '';
+    const order = s.players.map((p, i) => ({ p, i, pts: finalPts(s, i) })).sort((a, b) => b.pts - a.pts);
+    const again = mode === 'client' ? '<button class="btn big" data-act="leave">Quitter la partie</button>' : '<button class="btn primary big" data-act="new-go">Nouvelle partie</button>';
+    return '<div class="over"><div class="card"><h2>' + esc(s.players[s.winner].name) + ' gagne !</h2><ol>' +
+      order.map((o) => '<li><span class="dot" style="--pc:' + pcolor(o.i) + '"></span><b>' + esc(o.p.name) + '</b><span>' + o.pts + ' pts</span></li>').join('') +
+      '</ol>' + again + '</div></div>';
+  }
+
+  // ---------- Accueil, salon, jonction ----------
+  function qrSvg(text) {
+    try {
+      if (!window.qrcode) return '';
+      const q = window.qrcode(0, 'M');
+      q.addData(text);
+      q.make();
+      return q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+    } catch (e) { return ''; }
+  }
+  // Le QR code ouvre le bon lien : le site lui-même, avec le code de la salle déjà rempli.
+  const joinUrl = () => (inArtifact() ? ARTIFACT_URL + '#joueur' : location.href.split('#')[0] + '#j=' + ui.code);
+  const shortUrl = () => (inArtifact() ? ARTIFACT_URL : location.href.split('#')[0].replace(/^https?:\/\//, '').replace(/\/$/, ''));
+
+  function menuHTML() {
+    const saved = store.get(SAVE_KEY);
+    const savedHost = store.get(HOST_KEY);
+    let html = '<h2>Une île, cinq ressources, dix points</h2><p>Construis des routes, des colonies et des villes. Le premier à ' + E.WIN_POINTS + ' points gagne.</p><div class="modes">';
+    if (savedHost && savedHost.game && savedHost.game.phase !== 'ended') {
+      html += '<button class="mode-card resume" data-act="host-resume"><b>Reprendre la partie en ligne</b><span>Salle ' + esc(savedHost.code) + ' · ' + savedHost.game.players.map((p) => esc(p.name)).join(', ') + '</span></button>';
+    }
+    if (saved && saved.players && saved.phase !== 'ended') {
+      html += '<button class="mode-card resume" data-act="resume"><b>Reprendre la partie sur un écran</b><span>' + saved.players.map((p) => esc(p.name)).join(', ') + '</span></button>';
+    }
+    html += '<button class="mode-card" data-act="goto" data-s="host"><b>Plateau sur cet écran</b><span>Ordinateur ou télé. Chaque joueur voit sa main sur son téléphone.</span></button>' +
+      '<button class="mode-card" data-act="goto" data-s="join"><b>Rejoindre depuis mon téléphone</b><span>Entre le code affiché sur l\'écran du plateau.</span></button>' +
+      '<button class="mode-card" data-act="goto" data-s="setup"><b>Un seul écran pour tous</b><span>On se passe l\'appareil, sans téléphones.</span></button></div>';
+    return html;
+  }
+
+  function setupHTML() {
+    return '<button class="btn small back" data-act="goto" data-s="menu">← Retour</button><h2>Partie sur un seul écran</h2>' +
+      '<div><div class="section-title">Nombre de joueurs</div><div class="seg" role="group">' +
+      [2, 3, 4].map((n) => '<button class="btn" data-act="count" data-n="' + n + '" aria-pressed="' + (ui.count === n) + '">' + n + '</button>').join('') + '</div></div>' +
+      '<div class="names">' + Array.from({ length: ui.count }, (_, i) =>
+        '<label class="name-row" style="--pc:' + pcolor(i) + '"><span class="dot"></span><span class="sr">Nom du joueur ' + (i + 1) + '</span>' +
+        '<input id="name' + i + '" type="text" maxlength="14" value="' + esc(ui.names[i]) + '" autocomplete="off"><small>' + COLOR_FR[i] + '</small></label>').join('') + '</div>' +
+      '<button class="btn primary big" data-act="start">Lancer la partie</button>';
+  }
+
+  function hostLobbyHTML() {
+    const players = hostNet ? hostNet.lobby() : [];
+    const qr = qrSvg(joinUrl());
+    let html = '<button class="btn small back" data-act="host-cancel">← Annuler</button><h2>Salle de jeu</h2>';
+    if (ui.error) return html + '<p class="hint err">' + esc(ui.error) + '</p>';
+    html += '<div class="lobby"><div class="codebox"><span class="section-title">Code de la partie</span><b class="code" aria-label="Code">' + esc(ui.code) + '</b></div>' +
+      (qr ? '<div class="qr" role="img" aria-label="QR code pour rejoindre">' + qr + '</div>' : '') + '</div>' +
+      '<ol class="steps"><li>Scanne le QR code avec l\'appareil photo du téléphone, ou ouvre <span class="mono">' + esc(shortUrl()) + '</span></li><li>Si le code n\'est pas déjà rempli, choisis « Rejoindre depuis mon téléphone » et entre <b>' + esc(ui.code) + '</b></li><li>Entre ton prénom et touche « Rejoindre »</li></ol>';
+    html += '<div><div class="section-title">Joueurs connectés (' + players.length + '/4)</div><ul class="players">' + (players.length ? players.slice(0, 4).map((p, i) =>
+      '<li class="pl" style="--pc:' + pcolor(i) + '"><span class="dot"></span><b>' + esc(p.name) + '</b><span class="meta">' + COLOR_FR[i] + '</span></li>').join('') : '<li class="pl empty">En attente des téléphones…</li>') + '</ul>' +
+      (players.length > 4 ? '<p class="note">Seuls les 4 premiers arrivés joueront.</p>' : '') + '</div>';
+    html += '<button class="btn primary big" data-act="host-start"' + (players.length >= 2 ? '' : ' disabled') + '>Lancer la partie</button>' +
+      (inArtifact() ? '<p class="note">Les joueurs doivent avoir accès à l\'artefact (partage avec droit de contribution). Ne republie pas la page pendant une partie : cela déconnecte tout le monde.</p>' : '<p class="note">Aucun compte à créer. Les échanges entre appareils sont chiffrés : le serveur de salle ne voit passer que des messages illisibles.</p>');
+    return html;
+  }
+
+  function joinHTML() {
+    const w = ui.conn;
+    if (mode === 'client') {
+      let msg = '';
+      if (w === 'searching') msg = 'Recherche de l\'écran du plateau, salle ' + esc(ui.joinCode) + '…';
+      else if (w === 'found') msg = 'Écran trouvé, connexion sécurisée…';
+      else if (w === 'lobby') msg = 'Tu es dans la salle. La partie va bientôt commencer.';
+      else if (w === 'full') msg = 'Cette partie a déjà commencé et n\'a pas de place pour toi.';
+      return '<h2>Salle ' + esc(ui.joinCode) + '</h2><p class="hint go" role="status">' + msg + '</p>' +
+        (ui.lobby.length ? '<div><div class="section-title">Dans la salle</div><ul class="players">' + ui.lobby.map((n, i) => '<li class="pl" style="--pc:' + pcolor(i % 4) + '"><span class="dot"></span><b>' + esc(n) + '</b></li>').join('') + '</ul></div>' : '') +
+        '<button class="btn" data-act="leave">Changer de salle</button>';
+    }
+    return '<button class="btn small back" data-act="goto" data-s="menu">← Retour</button><h2>Rejoindre une partie</h2>' +
+      (ui.error ? '<p class="hint err">' + esc(ui.error) + '</p>' : '') +
+      '<label class="field"><span class="section-title">Code de la partie</span><input id="joinCode" class="code-input" type="text" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" value="' + esc(ui.joinCode) + '" placeholder="K7QM"></label>' +
+      '<label class="field"><span class="section-title">Ton prénom</span><input id="joinName" type="text" maxlength="14" autocomplete="off" value="' + esc(ui.myName) + '" placeholder="Prénom"></label>' +
+      '<button class="btn primary big" data-act="join"' + (ui.busy ? ' disabled' : '') + '>' + (ui.busy ? 'Connexion…' : 'Rejoindre') + '</button>';
+  }
+
+  function welcomeHTML() {
+    if (ui.screen === 'setup') return setupHTML();
+    if (ui.screen === 'host') return hostLobbyHTML();
+    if (ui.screen === 'join') return joinHTML();
+    return menuHTML();
+  }
+
+  // ---------- Rendu ----------
+  function renderTop() {
+    let h = '';
+    if (game && mode === 'client') h = '<span class="conn' + (ui.conn === 'playing' ? ' on' : '') + '" title="' + (ui.conn === 'playing' ? 'Connecté' : 'Connexion perdue') + '">' + (ui.conn === 'playing' ? 'En ligne' : 'Hors ligne') + '</span><button class="btn small" data-act="leave">Quitter</button>';
+    else if (game && ui.confirmNew) h = '<button class="btn small danger" data-act="new-go">Abandonner la partie</button><button class="btn small" data-act="new-cancel">Continuer</button>';
+    else if (game) h = '<button class="btn small" data-act="new">Nouvelle partie</button>';
+    $('topActions').innerHTML = h;
+  }
+  function renderHand() {
+    if (game && mode !== 'host') $('hand').innerHTML = handHTML();
+  }
+  function renderWelcome() {
+    if (!game) $('welcome').innerHTML = welcomeHTML();
+  }
+  function renderNav() {
+    const nav = $('nav');
+    nav.hidden = !(game && mode === 'client');
+    if (nav.hidden) return;
+    const mine = needsMe(game, ui.seat);
+    nav.innerHTML = [['hand', 'Ma main', mine], ['board', 'Plateau', false], ['info', 'Joueurs', false]].map((t) =>
+      '<button class="nav-btn" data-act="phone-tab" data-k="' + t[0] + '" aria-pressed="' + (ui.phoneTab === t[0]) + '">' + t[1] + (t[2] ? '<span class="alert"></span>' : '') + '</button>').join('');
+  }
+  function render() {
+    renderTop();
+    $('welcome').hidden = !!game;
+    $('game').hidden = !game;
+    document.body.classList.toggle('is-client', !!game && mode === 'client');
+    if (!game) { renderWelcome(); renderNav(); return; }
+    const g = $('game');
+    g.className = 'layout ' + mode;
+    if (mode === 'local' && game.turn !== ui.lastTurn) { ui.pin = null; ui.lastTurn = game.turn; }
+    $('board').innerHTML = boardHTML();
+    if (mode === 'client') {
+      const mine = needsMe(game, ui.seat);
+      if (ui.needBoard && !ui.wasNeed) ui.phoneTab = 'board';
+      if (!ui.needBoard && ui.wasNeed && ui.phoneTab === 'board') ui.phoneTab = 'hand';
+      ui.wasNeed = ui.needBoard;
+      if (mine && !ui.wasMine) { try { if (navigator.vibrate) navigator.vibrate(180); } catch (e) { /* non pris en charge */ } }
+      ui.wasMine = mine;
+      g.dataset.tab = ui.phoneTab;
+    }
+    $('banner').innerHTML = bannerHTML();
+    if (mode !== 'host') {
+      $('hand').style.setProperty('--pc', pcolor(viewer()));
+      renderHand();
+    }
+    $('scores').innerHTML = scoresHTML();
+    $('log').innerHTML = logHTML();
+    const over = $('over');
+    over.innerHTML = overHTML();
+    over.hidden = game.phase !== 'ended';
+    renderNav();
+  }
+
+  // ---------- Parties locales ----------
+  const newSeed = () => (Date.now() ^ Math.floor(performance.now() * 1000) ^ Math.floor(Math.random() * 0x7fffffff)) | 0;
+  function startLocal() {
+    const names = [];
+    for (let i = 0; i < ui.count; i++) {
+      const el = $('name' + i);
+      const v = (el ? el.value : ui.names[i]).trim() || ui.names[i];
+      ui.names[i] = v;
+      names.push(v);
+    }
+    game = E.newGame({ names, seed: newSeed() });
+    mode = 'local';
+    ui.pin = null; ui.mode = null; ui.lastTurn = -1; ui.diceKey = ''; ui.tradeOpen = false; ui.confirmNew = false;
+    save();
+    render();
+  }
+
+  // ---------- Salle en ligne ----------
+  // Dans un artefact : capacité `room`. Sur un site : courtier MQTT public (src/mqtt-room.js).
+  const inArtifact = () => !!(window.claude && window.claude.use);
+  async function openRoom(code) {
+    const cap = inArtifact() ? await window.claude.use('room') : null;
+    if (cap) return cap.join('colons-' + code.toLowerCase());
+    if (window.MqttRoom) {
+      try { return await window.MqttRoom.join(code); } catch (e) {
+        throw new Error('Impossible de joindre le serveur de salle. Vérifie ta connexion et réessaie.');
+      }
+    }
+    throw new Error('Le mode en ligne n\'est pas disponible ici.');
+  }
+  const makeCode = () => Array.from({ length: 4 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+
+  async function hostOpen(resume) {
+    ui.error = '';
+    ui.screen = 'host';
+    const saved = resume ? store.get(HOST_KEY) : null;
+    ui.code = saved ? saved.code : makeCode();
+    render();
+    try {
+      if (!N.available()) throw new Error('Ce navigateur ne permet pas le chiffrement nécessaire au mode en ligne.');
+      activeRoom = await openRoom(ui.code);
+      const identity = await N.newIdentity();
+      hostNet = N.createHost({
+        room: activeRoom, identity, seats: saved ? saved.seats : {},
+        viewOf: (seat) => E.viewFor(game, seat, { board: false, log: 14 }),
+        onAct: hostAct,
+        onLobby: () => { if (!game) renderWelcome(); else $('scores').innerHTML = scoresHTML(); },
+      });
+      if (saved) {
+        game = fat(saved.game);
+        mode = 'host';
+        hostNet.setStatus('play');
+        ui.lastTurn = -1;
+        render();
+      } else renderWelcome();
+    } catch (e) {
+      ui.error = e && e.message ? e.message : 'Impossible d\'ouvrir la salle.';
+      renderWelcome();
+    }
+  }
+  function hostAct(seat, action) {
+    if (!game || mode !== 'host' || !action || typeof action.type !== 'string') return 'Pas de partie en cours.';
+    const r = E.apply(game, Object.assign({}, action, { player: seat }));
+    if (!r.ok) return r.error;
+    game = r.state;
+    save();
+    render();
+    hostNet.publish();
+    return null;
+  }
+  function hostStart() {
+    const players = hostNet.lobby().slice(0, 4);
+    if (players.length < 2) return;
+    game = E.newGame({ names: players.map((p) => p.name), seed: newSeed() });
+    const seats = {};
+    players.forEach((p, i) => { seats[p.pub] = i; });
+    hostNet.setSeats(seats);
+    mode = 'host';
+    ui.lastTurn = -1; ui.diceKey = '';
+    save();
+    hostNet.setStatus('play');
+    render();
+  }
+  function hostClose(clear) {
+    if (hostNet) { hostNet.close(); hostNet = null; }
+    if (activeRoom) { activeRoom.leave().catch(() => {}); activeRoom = null; }
+    if (clear) store.del(HOST_KEY);
+    game = null; mode = 'menu'; ui.screen = 'menu'; ui.error = '';
+    render();
+  }
+  function hostNewGame() {
+    store.del(HOST_KEY);
+    game = null; mode = 'menu';
+    ui.screen = 'host'; ui.confirmNew = false;
+    hostNet.setSeats({});
+    hostNet.setStatus('lobby');
+    render();
+  }
+
+  async function joinGame() {
+    const code = ($('joinCode').value || '').trim().toUpperCase();
+    const name = ($('joinName').value || '').trim();
+    ui.joinCode = code; ui.myName = name; ui.error = '';
+    if (code.length !== 4) { ui.error = 'Le code a 4 caractères.'; renderWelcome(); return; }
+    if (!name) { ui.error = 'Entre ton prénom.'; renderWelcome(); return; }
+    ui.busy = true; renderWelcome();
+    try {
+      if (!N.available()) throw new Error('Ce navigateur ne permet pas le chiffrement nécessaire au mode en ligne.');
+      const room = await openRoom(code);
+      const saved = store.get(CLIENT_KEY);
+      let identity = null;
+      if (saved && saved.identity) { try { identity = await N.restoreIdentity(saved.identity); } catch (e) { identity = null; } }
+      if (!identity) identity = await N.newIdentity();
+      store.set(CLIENT_KEY, { identity: { pub: identity.pub, jwk: identity.jwk }, name, code });
+      activeRoom = room;
+      mode = 'client';
+      ui.conn = 'searching'; ui.lobby = []; ui.seat = -1; ui.boardSeed = null;
+      clientNet = N.createClient({
+        room, identity, name,
+        onView: onPhoneView,
+        onStatus: (s) => {
+          ui.conn = s;
+          if (s === 'lobby' || s === 'full') { game = null; ui.seat = -1; }
+          if (game) { renderTop(); $('banner').innerHTML = bannerHTML(); } else render();
+        },
+        onLobby: (names) => { ui.lobby = names; if (!game) renderWelcome(); },
+        onError: (text) => { ui.pending = 0; say(text); },
+      });
+      ui.busy = false;
+      render();
+    } catch (e) {
+      ui.busy = false; mode = 'menu';
+      ui.error = e && e.message ? e.message : 'Impossible de rejoindre la salle.';
+      renderWelcome();
+    }
+  }
+  function onPhoneView(p) {
+    const view = p.view;
+    if (ui.boardSeed !== view.seed || !ui.board) { ui.board = E.boardFromSeed(view.seed); ui.boardSeed = view.seed; }
+    view.board = ui.board;
+    game = view;
+    ui.seat = p.seat;
+    ui.pending = 0;
+    render();
+  }
+  function leaveGame() {
+    if (clientNet) { clientNet.close(); clientNet = null; }
+    if (activeRoom) { activeRoom.leave().catch(() => {}); activeRoom = null; }
+    game = null; mode = 'menu'; ui.screen = 'menu'; ui.seat = -1; ui.phoneTab = 'hand'; ui.wasNeed = false; ui.wasMine = false;
+    render();
+  }
+
+  // ---------- Événements ----------
+  const handlers = {
+    goto: (t) => { ui.screen = t.dataset.s; ui.error = ''; if (ui.screen === 'host') return hostOpen(false); renderWelcome(); },
+    'host-resume': () => hostOpen(true),
+    'host-cancel': () => hostClose(false),
+    'host-start': hostStart,
+    join: joinGame,
+    leave: leaveGame,
+    start: startLocal,
+    resume: () => { const g = store.get(SAVE_KEY); if (validGame(g)) { game = fat(g); mode = 'local'; ui.lastTurn = -1; render(); } },
+    count: (t) => { ui.names.forEach((n, i) => { const el = $('name' + i); if (el) ui.names[i] = el.value; }); ui.count = +t.dataset.n; renderWelcome(); },
+    new: () => { ui.confirmNew = true; renderTop(); },
+    'new-cancel': () => { ui.confirmNew = false; renderTop(); },
+    'new-go': () => {
+      ui.confirmNew = false;
+      if (mode === 'host') return hostNewGame();
+      store.del(SAVE_KEY); game = null; mode = 'menu'; ui.screen = 'menu'; render();
+    },
+    'phone-tab': (t) => { ui.phoneTab = t.dataset.k; render(); },
+    view: (t) => { ui.pin = +t.dataset.i; ui.mode = null; render(); },
+    roll: () => dispatch({ type: 'roll', player: viewer() }),
+    end: () => dispatch({ type: 'endTurn', player: viewer() }),
+    buy: () => dispatch({ type: 'buyDev', player: viewer() }),
+    mode: (t) => { ui.mode = ui.mode === t.dataset.k ? null : t.dataset.k; ui.tradeOpen = false; render(); },
+    'trade-toggle': () => { ui.tradeOpen = !ui.tradeOpen; ui.mode = null; renderHand(); },
+    tab: (t) => { ui.tab = t.dataset.k; renderHand(); },
+    'bank-give': (t) => { ui.bankGive = t.dataset.r; if (ui.bankGet === ui.bankGive) ui.bankGet = null; renderHand(); },
+    'bank-get': (t) => { ui.bankGet = t.dataset.r; renderHand(); },
+    'bank-do': () => dispatch({ type: 'bankTrade', player: viewer(), give: ui.bankGive, get: ui.bankGet }),
+    step: (t) => {
+      const set = ui[t.dataset.set];
+      set[t.dataset.r] = Math.max(0, set[t.dataset.r] + +t.dataset.d);
+      renderHand();
+    },
+    offer: () => dispatch({ type: 'offerTrade', player: viewer(), give: ui.give, want: ui.want }),
+    'cancel-offer': () => dispatch({ type: 'cancelTrade', player: viewer() }),
+    respond: (t) => dispatch({ type: 'respondTrade', player: viewer(), accept: t.dataset.a === '1' }),
+    confirm: (t) => dispatch({ type: 'confirmTrade', player: viewer(), with: +t.dataset.with }),
+    discard: () => dispatch({ type: 'discard', player: viewer(), cards: ui.discard }),
+    steal: (t) => dispatch({ type: 'steal', player: viewer(), victim: +t.dataset.i }),
+    dev: (t) => {
+      const k = t.dataset.k, player = viewer();
+      if (k === 'knight') dispatch({ type: 'playKnight', player });
+      else if (k === 'roadBuilding') dispatch({ type: 'playRoadBuilding', player });
+      else { ui.pick = k === 'yearOfPlenty' ? 'yop' : 'mono'; ui.yop = []; renderHand(); }
+    },
+    'pick-res': (t) => {
+      const r = t.dataset.r;
+      if (ui.pick === 'mono') return dispatch({ type: 'playMonopoly', player: viewer(), res: r });
+      ui.yop.push(r);
+      if (ui.yop.length === 2) return dispatch({ type: 'playYearOfPlenty', player: viewer(), a: ui.yop[0], b: ui.yop[1] });
+      renderHand();
+    },
+    'pick-cancel': () => { ui.pick = null; ui.yop = []; renderHand(); },
+  };
+
+  function onBoardClick(t) {
+    if (mode === 'host') return;
+    const pid = myPid();
+    if (t.dataset.v !== undefined) dispatch({ type: ui.mode === 'city' ? 'placeCity' : 'placeSettlement', player: pid, vertex: +t.dataset.v });
+    else if (t.dataset.e !== undefined) dispatch({ type: 'placeRoad', player: pid, edge: +t.dataset.e });
+    else if (t.dataset.h !== undefined) dispatch({ type: 'moveRobber', player: pid, hex: +t.dataset.h });
+  }
+
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-act],[data-v],[data-e],[data-h]');
+    if (!t) return;
+    if (t.dataset.act) {
+      const h = handlers[t.dataset.act];
+      if (h) h(t);
+    } else if (game) onBoardClick(t);
+  });
+  document.addEventListener('input', (e) => {
+    if (e.target.id === 'joinCode') { e.target.value = e.target.value.toUpperCase(); ui.joinCode = e.target.value; }
+    else if (e.target.id === 'joinName') ui.myName = e.target.value;
+  });
+
+  // ---------- Démarrage ----------
+  const savedClient = store.get(CLIENT_KEY);
+  if (savedClient) { ui.myName = savedClient.name || ''; ui.joinCode = savedClient.code || ''; }
+  const hash = (location.hash || '').replace('#', '');
+  const hashCode = /^j=([A-Za-z0-9]{4})$/.exec(hash);
+  if (hashCode) { ui.joinCode = hashCode[1].toUpperCase(); ui.screen = 'join'; }
+  else if (hash === 'joueur') ui.screen = 'join';
+  render();
+  if (hash === 'plateau') hostOpen(false);
+})();
+
+</script>

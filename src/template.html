@@ -1,0 +1,90 @@
+<title>Colons de l'Île</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@500;600;700&display=swap">
+<style>
+/*CSS*/
+</style>
+
+<!-- Pictogrammes des ressources : un disque teinté et un signe clair, lisibles sur toute couleur. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    /*ART*/
+    <symbol id="g-wood" viewBox="-14 -14 28 28">
+      <circle r="13.5" fill="#2c5b36"/>
+      <path d="M0-9 6-1H-6ZM0-4 8 6H-8Z" fill="#e4f2dc"/>
+      <rect x="-1.6" y="6" width="3.2" height="4.5" fill="#e4f2dc"/>
+    </symbol>
+    <symbol id="g-brick" viewBox="-14 -14 28 28">
+      <circle r="13.5" fill="#8f3f22"/>
+      <g fill="#f6d9c9">
+        <rect x="-9" y="-8" width="8.4" height="4.8" rx=".8"/><rect x=".6" y="-8" width="8.4" height="4.8" rx=".8"/>
+        <rect x="-4.2" y="-2.4" width="8.4" height="4.8" rx=".8"/><rect x="-9" y="-2.4" width="3.6" height="4.8" rx=".8"/><rect x="5.4" y="-2.4" width="3.6" height="4.8" rx=".8"/>
+        <rect x="-9" y="3.2" width="8.4" height="4.8" rx=".8"/><rect x=".6" y="3.2" width="8.4" height="4.8" rx=".8"/>
+      </g>
+    </symbol>
+    <symbol id="g-sheep" viewBox="-14 -14 28 28">
+      <circle r="13.5" fill="#5d8a28"/>
+      <g fill="#2b3a1a"><rect x="-5.5" y="5" width="2.2" height="5"/><rect x="2.5" y="5" width="2.2" height="5"/><circle cx="8" cy="-1.5" r="3.4"/></g>
+      <g fill="#fff"><ellipse cx="-.5" cy="1" rx="8.5" ry="6"/><circle cx="-5" cy="-2" r="3.6"/><circle cx="-.5" cy="-4" r="3.8"/><circle cx="4" cy="-2.5" r="3.2"/></g>
+    </symbol>
+    <symbol id="g-wheat" viewBox="-14 -14 28 28">
+      <circle r="13.5" fill="#a67c0a"/>
+      <path d="M0 10V-9" stroke="#fff4cc" stroke-width="1.7" stroke-linecap="round"/>
+      <g fill="#fff4cc">
+        <ellipse cx="-3.6" cy="-4.5" rx="2" ry="3.6" transform="rotate(-28 -3.6 -4.5)"/><ellipse cx="3.6" cy="-4.5" rx="2" ry="3.6" transform="rotate(28 3.6 -4.5)"/>
+        <ellipse cx="-3.6" cy="0.5" rx="2" ry="3.6" transform="rotate(-28 -3.6 .5)"/><ellipse cx="3.6" cy="0.5" rx="2" ry="3.6" transform="rotate(28 3.6 .5)"/>
+        <ellipse cx="-3.6" cy="5.5" rx="2" ry="3.6" transform="rotate(-28 -3.6 5.5)"/><ellipse cx="3.6" cy="5.5" rx="2" ry="3.6" transform="rotate(28 3.6 5.5)"/>
+        <ellipse cx="0" cy="-9.5" rx="1.8" ry="3.2"/>
+      </g>
+    </symbol>
+    <symbol id="g-ore" viewBox="-14 -14 28 28">
+      <circle r="13.5" fill="#566070"/>
+      <path d="M-10 8-3-6 2 2 5-3 11 8Z" fill="#e7ecf2"/>
+      <path d="M-3-6-6-.5-3-1.8 0-.5Z" fill="#9aa5b4"/>
+    </symbol>
+    <symbol id="g-desert" viewBox="-14 -14 28 28">
+      <circle r="13.5" fill="#a58f4b"/>
+      <circle r="4.6" fill="#fff0b0"/>
+      <g stroke="#fff0b0" stroke-width="1.8" stroke-linecap="round"><path d="M0-7.5V-10M0 7.5V10M-7.5 0H-10M7.5 0H10M-5.3-5.3l-1.8-1.8M5.3 5.3l1.8 1.8M5.3-5.3l1.8-1.8M-5.3 5.3l-1.8 1.8"/></g>
+    </symbol>
+  </defs>
+</svg>
+
+<div id="app">
+  <header class="top">
+    <div class="brand"><h1>Colons de l'Île</h1><span>Plateau sur l'écran, mains sur les téléphones</span></div>
+    <div class="top-actions" id="topActions"></div>
+  </header>
+  <main id="welcome" class="card welcome" hidden></main>
+  <div id="game" class="layout" hidden>
+    <section class="stage" aria-label="Plateau de jeu">
+      <div class="stage-card">
+        <div class="banner" id="banner"></div>
+        <svg id="board" viewBox="-560 -520 1120 1040" role="img" aria-label="Plateau hexagonal"></svg>
+        <div id="over" hidden></div>
+      </div>
+    </section>
+    <div class="side">
+      <section class="card hand" id="hand" aria-label="Main du joueur"></section>
+      <section class="card scores" id="scores" aria-label="Scores"></section>
+      <section class="card log" id="log" aria-label="Journal"></section>
+    </div>
+  </div>
+  <nav id="nav" class="nav" hidden aria-label="Navigation du téléphone"></nav>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+/*ENGINE*/
+</script>
+<script>
+/*MQTT*/
+</script>
+<script>
+/*NET*/
+</script>
+<script>
+/*UI*/
+</script>

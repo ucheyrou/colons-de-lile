@@ -1,0 +1,91 @@
+# CLAUDE.md — Colons de l'Île
+
+Jeu de plateau en ligne (inspiré des règles de base de Catan). Plateau sur ordinateur, main privée de chaque joueur sur téléphone. Lis `PLAN.md` avant toute modification structurante et `RULES.md` avant de toucher aux règles.
+
+## Langue
+- Interface, journal de partie, messages d'erreur et commentaires de règles : **français**.
+- Identifiants de code : anglais (`placeRoad`, `wood`, `brick`…).
+
+## Propriété intellectuelle
+- Ne jamais écrire « Catan » dans l'interface, le `<title>` ou les visuels. Nom du jeu : **Colons de l'Île**.
+- Tous les visuels sont dessinés ici (SVG inline). Ne pas copier d'illustrations, de polices ou de textes d'un jeu du commerce.
+
+## Architecture (ne pas casser)
+```
+src/engine.js      Règles. Pur, sans DOM, sans date, sans Math.random. Testable sous Node.
+src/net.js         Transport écran <-> téléphones (chiffrement ECDH/AES-GCM, découpage, resynchronisation). Sans DOM ni règles.
+src/ui.js          Interface, 3 modes (local, host, client). Aucune règle : appelle E.available / E.legal* / E.apply.
+src/art.svg        Scènes illustrées des tuiles et motifs (injectées dans le template).
+src/style.css      Styles, thème clair/sombre par jetons.
+src/template.html  Squelette ; build.mjs y injecte engine.js, ui.js, style.css.
+test/*.test.mjs    Tests moteur (node --test).
+build.mjs          Produit dist/index.html (un seul fichier, c'est lui qu'on publie).
+```
+Règles d'or :
+1. **Le moteur est l'unique source de vérité.** Si l'UI a besoin d'une info de règle, on l'ajoute au moteur (`available`, `legal*`, `viewFor`), on ne la recalcule pas dans l'UI.
+2. **`apply(état, action)` ne modifie jamais son entrée** et renvoie `{ok, state, error}`. Une action illégale renvoie `ok:false` avec un message français, jamais une exception.
+3. **Tout hasard passe par `state.rng`.** Jamais `Math.random()` dans le moteur.
+4. **L'état est du JSON pur** (pas de classes, pas de Map/Set, pas de fonctions) : il doit survivre à `JSON.parse(JSON.stringify(s))` et traverser le réseau.
+5. **Les mains privées** n'existent que dans l'état hôte. Tout ce qui sort vers un client passe par `viewFor(état, joueur)`.
+6. Une action = un objet `{type, player, ...}`. Le champ `player` est vérifié par le moteur (on ne joue que quand c'est son tour, sauf défausse et réponse d'échange).
+
+## Commandes
+```
+node --test test/*.test.mjs           # tests moteur
+node build.mjs               # génère dist/index.html
+node test/simulate.mjs 200   # 200 parties aléatoires, vérifie les invariants
+node test/e2e.mjs            # écran + 3 téléphones en jsdom (jsdom requis : npm i --no-save jsdom)
+```
+Ne publie l'artefact qu'après `node --test` et `node build.mjs` verts.
+
+## Publication (artefact)
+- Publier `dist/index.html` avec l'outil Artifact, même chemin à chaque fois pour garder le même lien, avec `capabilities: {room: {topics: {a: "interact"}}}`.
+- Le lien de l'artefact est écrit en dur dans `src/ui.js` (`ARTIFACT_URL`, pour le QR) : à mettre à jour si l'artefact change d'adresse.
+- Le fichier publié ne contient ni `<html>`, ni `<head>`, ni `<body>` (le squelette est ajouté à la publication). `<title>` en tête : « Colons de l'Île ».
+- Bibliothèques externes : à éviter. Si indispensable, cdnjs, version exacte vieille d'au moins 2 semaines.
+- `alert/confirm/prompt` sont inertes : toute confirmation est une interface dans la page.
+- Thème : jetons de couleur sur `:root`, redéfinis pour `prefers-color-scheme: dark` (avec `:root:not([data-theme="light"])`) et `:root[data-theme="dark"]`. Les couleurs de terrain et de joueurs sont sémantiques et restent fixes.
+- Mobile : largeur 400 px sans défilement horizontal, cibles tactiles ≥ 44 px, marges latérales `max(16px, env(safe-area-inset-*))`.
+
+## Conventions de code
+- JS sans dépendance, sans transpilation, ES2020. Pas de framework. Fonctions courtes, noms explicites.
+- Un commentaire n'explique que le *pourquoi* ou une règle de jeu non évidente.
+- Pas de `console.log` oublié. Pas de code mort.
+- CSS : classes en minuscules-tirets, tout via les jetons `--*`.
+
+## Répartition pour sous-agents
+Chaque agent ne touche qu'à ses fichiers ; les interfaces entre eux sont les noms exportés du moteur.
+
+| Rôle | Fichiers | Mission |
+|---|---|---|
+| Moteur | `src/engine.js`, `test/` | Règles, vues privées, invariants |
+| Interface | `src/ui.js`, `src/style.css`, `src/template.html` | Plateau SVG, main du joueur, accessibilité |
+| Réseau (P3) | `src/net.js` | Salon, messages `room`, reconnexion, sauvegarde `db` |
+| QA règles | `RULES.md`, `test/` | Compare le comportement aux règles, écrit les cas limites |
+| Revue | lecture seule | `/code-review`, `/simplify` avant chaque publication |
+
+Un agent qui découvre un bug dans le fichier d'un autre le signale (message ou test qui échoue) au lieu de le corriger en douce.
+
+## Skills utiles
+- `artifact-design`, `artifact-capabilities` : à charger avant toute publication ou tout code `window.claude.*`.
+- `catan-rules` (projet, `.claude/skills/catan-rules`) : règles de référence, à consulter pour toute question de règle.
+- `run`, `code-review`, `simplify` : vérification et nettoyage.
+
+## Environnement
+- Node n'est pas installé sur la machine du projet. Pour lancer les tests, télécharger un binaire Node officiel dans un dossier temporaire (jamais d'installation système sans demander) et l'ajouter au `PATH` le temps de la session.
+- Test d'interface sans navigateur : `jsdom` installé dans un dossier temporaire, page `dist/index.html` chargée avec `runScripts: 'dangerously'`, clics simulés sur `[data-act]`, `[data-v]`, `[data-e]`, `[data-h]`.
+- L'extension Chrome peut être absente : ne pas compter dessus pour relire le rendu.
+
+## Réseau (src/net.js)
+- Hôte autoritaire : seul l'écran du plateau détient l'état réel. Les téléphones envoient `{type, ...}` chiffré sur le sujet `a` ; l'hôte impose le siège (`player` n'est jamais cru) et répond sur `v`.
+- Tout message de jeu est chiffré (AES-GCM, clé dérivée ECDH). Ne jamais mettre de main ou de carte en clair dans une présence ou un message.
+- Message plateforme ≤ 4 Kio : toujours passer par `emitSealed` (découpage).
+- Le plateau n'est jamais transmis : `E.boardFromSeed(seed)`. Une vue = `E.viewFor(état, siège, {board:false, log:14})`.
+- Tester avec `test/fake-room.mjs` (salon en mémoire) : `node --test test/net.test.mjs`.
+- Capacité à déclarer à la publication : `room` avec `topics: {a: "interact"}`.
+
+## Pièges connus
+- Sommets/arêtes : identifiés par position arrondie à 1e-3 sur un hexagone de rayon 1 ; ne pas changer la formule des coins sans relancer les tests.
+- Les clés d'objets (`buildings`, `roads`) deviennent des chaînes après JSON ; comparer les identifiants avec `===` seulement après les avoir lus comme nombres.
+- Une carte de développement achetée ce tour-ci ne se joue qu'au tour suivant (sauf point de victoire, qui compte tout de suite) ; une seule carte de développement jouée par tour.
+- La victoire n'est vérifiée que pour le joueur dont c'est le tour.

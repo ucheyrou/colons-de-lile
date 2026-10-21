@@ -1,0 +1,119 @@
+<!-- Scènes des tuiles : hexagone de rayon 100 centré sur l'origine. Chaque scène est rognée par #hexclip. -->
+<clipPath id="hexclip"><polygon points="86.6,-50 86.6,50 0,100 -86.6,50 -86.6,-50 0,-100"/></clipPath>
+
+<linearGradient id="gr-forest" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5fa064"/><stop offset="1" stop-color="#3b7a49"/></linearGradient>
+<linearGradient id="gr-pasture" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c4e690"/><stop offset="1" stop-color="#94c45d"/></linearGradient>
+<linearGradient id="gr-fields" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6da75"/><stop offset="1" stop-color="#dfb24a"/></linearGradient>
+<linearGradient id="gr-hills" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6a077"/><stop offset="1" stop-color="#c1653d"/></linearGradient>
+<linearGradient id="gr-mountains" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d0da"/><stop offset="1" stop-color="#8d97a6"/></linearGradient>
+<linearGradient id="gr-desert" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3e6b9"/><stop offset="1" stop-color="#dcc684"/></linearGradient>
+<radialGradient id="hexshade" cx="0.5" cy="0.4" r="0.75"><stop offset="0.55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#1b2a30" stop-opacity=".22"/></radialGradient>
+<radialGradient id="tokengrad" cx="0.4" cy="0.3" r="0.9"><stop offset="0" stop-color="#fffef9"/><stop offset="1" stop-color="#eadfc4"/></radialGradient>
+<radialGradient id="seagrad" cx="0.5" cy="0.45" r="0.7"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<pattern id="furrow" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(-24)"><path d="M0 8H16" stroke="#c4902a" stroke-width="3.2" opacity=".5"/><path d="M0 12.5H16" stroke="#fff3bb" stroke-width="1.6" opacity=".4"/></pattern>
+<pattern id="waves" width="54" height="28" patternUnits="userSpaceOnUse"><path d="M0 14q13.5-11 27 0t27 0" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="2.6" stroke-linecap="round"/></pattern>
+
+<!-- Éléments réutilisables -->
+<g id="pine">
+  <rect x="-2.6" y="-3" width="5.2" height="9" fill="#5b3a22"/>
+  <path d="M0-60 15-31H-15Z" fill="#2b6a3b"/><path d="M0-44 19-13H-19Z" fill="#32794a"/><path d="M0-27 23 2H-23Z" fill="#3b8a55"/>
+  <path d="M0-60 15-31H3Z M0-44 19-13H4Z M0-27 23 2H5Z" fill="#fff" opacity=".13"/>
+</g>
+<g id="lamb">
+  <rect x="-6.5" y="6" width="2.4" height="6" fill="#33392a"/><rect x="4" y="6" width="2.4" height="6" fill="#33392a"/>
+  <ellipse cx="14" cy="-1" rx="4.6" ry="4" fill="#33392a"/>
+  <ellipse cx="0" cy="0" rx="12" ry="8" fill="#fff"/><circle cx="-7" cy="-3" r="5.2" fill="#fff"/><circle cx="-1" cy="-6.5" r="5.8" fill="#fff"/><circle cx="6" cy="-3.5" r="5" fill="#fff"/>
+  <ellipse cx="0" cy="5" rx="11" ry="3" fill="#000" opacity=".06"/>
+</g>
+<g id="tuft">
+  <path d="M0 0V-26M-6 0-10-22M6 0 10-22" stroke="#9a6d12" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <g fill="#f9e38f" stroke="#b98a1c" stroke-width=".9">
+    <ellipse cx="0" cy="-30" rx="3" ry="6"/><ellipse cx="-10.5" cy="-26" rx="2.8" ry="5.4" transform="rotate(-14 -10.5 -26)"/><ellipse cx="10.5" cy="-26" rx="2.8" ry="5.4" transform="rotate(14 10.5 -26)"/>
+  </g>
+</g>
+<g id="bale"><circle r="8.5" fill="#ebc45c" stroke="#a97c1c" stroke-width="1.4"/><path d="M0 0m-3 0a3 3 0 1 1 3 3" fill="none" stroke="#a97c1c" stroke-width="1.2"/></g>
+<g id="brickpile">
+  <g fill="#93421f" stroke="#e8b095" stroke-width=".9">
+    <rect x="-16" y="-4" width="10" height="6" rx="1"/><rect x="-5" y="-4" width="10" height="6" rx="1"/><rect x="6" y="-4" width="10" height="6" rx="1"/>
+    <rect x="-10.5" y="-11" width="10" height="6" rx="1"/><rect x=".5" y="-11" width="10" height="6" rx="1"/>
+    <rect x="-5" y="-18" width="10" height="6" rx="1"/>
+  </g>
+</g>
+<g id="cactus">
+  <rect x="-4" y="-26" width="8" height="30" rx="4" fill="#4e8a4a"/>
+  <path d="M-4-10H-11a4 4 0 0 1-4-4V-20" fill="none" stroke="#4e8a4a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M4-6H11a4 4 0 0 0 4-4V-16" fill="none" stroke="#4e8a4a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M-1-26V0" stroke="#7bb274" stroke-width="1.6" opacity=".7"/>
+</g>
+<g id="flower"><circle r="2.6" fill="#fff7cf"/><circle r="1" fill="#f0b43c"/></g>
+
+<!-- Scènes -->
+<g id="t-forest">
+  <rect x="-100" y="-100" width="200" height="200" fill="url(#gr-forest)"/>
+  <path d="M-100 58Q-45 26 5 52T100 40V100H-100Z" fill="#2c653a" opacity=".5"/>
+  <use href="#pine" transform="translate(-40 -50) scale(.58)"/>
+  <use href="#pine" transform="translate(44 -52) scale(.6)"/>
+  <use href="#pine" transform="translate(-70 -12) scale(.82)"/>
+  <use href="#pine" transform="translate(70 -10) scale(.86)"/>
+  <use href="#pine" transform="translate(-74 40) scale(.62)"/>
+  <use href="#pine" transform="translate(-48 62) scale(.92)"/>
+  <use href="#pine" transform="translate(52 64) scale(.9)"/>
+  <use href="#pine" transform="translate(76 34) scale(.6)"/>
+  <use href="#pine" transform="translate(-10 78) scale(.7)"/>
+  <circle cx="30" cy="70" r="6" fill="#2b6a3b"/><circle cx="-24" cy="72" r="5" fill="#35794a"/>
+</g>
+<g id="t-pasture">
+  <rect x="-100" y="-100" width="200" height="200" fill="url(#gr-pasture)"/>
+  <path d="M-100 14Q-50-18 0 10T100 0V100H-100Z" fill="#a9d36f"/>
+  <path d="M-100 62Q-40 34 20 58T100 48V100H-100Z" fill="#86b852"/>
+  <path d="M-84 -52Q-60-66-36-54" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="3" stroke-linecap="round"/>
+  <g stroke="#8a6a3e" stroke-width="2.4" stroke-linecap="round"><path d="M-84 60H-56M-80 54V66M-66 54V66M-56 54V66"/><path d="M52 -34H80M56 -40V-28M68 -40V-28M78 -40V-28"/></g>
+  <use href="#lamb" transform="translate(-58 28) scale(.9)"/>
+  <use href="#lamb" transform="translate(-46 -26) scale(.7)"/>
+  <use href="#lamb" transform="translate(60 -4) scale(.85)"/>
+  <use href="#lamb" transform="translate(44 62) scale(.8) scale(-1 1)"/>
+  <use href="#flower" transform="translate(-24 -52)"/><use href="#flower" transform="translate(24 -56)"/><use href="#flower" transform="translate(-20 74)"/>
+  <use href="#flower" transform="translate(72 36)"/><use href="#flower" transform="translate(8 82)"/><use href="#flower" transform="translate(-76 -8)"/>
+</g>
+<g id="t-fields">
+  <rect x="-100" y="-100" width="200" height="200" fill="url(#gr-fields)"/>
+  <rect x="-100" y="-100" width="200" height="200" fill="url(#furrow)"/>
+  <path d="M-100 68Q-30 40 40 64T100 56V100H-100Z" fill="#c99a33" opacity=".35"/>
+  <use href="#tuft" transform="translate(-62 -10) scale(.9)"/>
+  <use href="#tuft" transform="translate(-44 54) scale(1)"/>
+  <use href="#tuft" transform="translate(64 -6) scale(.9)"/>
+  <use href="#tuft" transform="translate(48 60) scale(1)"/>
+  <use href="#tuft" transform="translate(-36 -46) scale(.6)"/>
+  <use href="#tuft" transform="translate(40 -50) scale(.6)"/>
+  <use href="#bale" transform="translate(-70 34)"/><use href="#bale" transform="translate(74 36) scale(.8)"/>
+</g>
+<g id="t-hills">
+  <rect x="-100" y="-100" width="200" height="200" fill="url(#gr-hills)"/>
+  <path d="M-100 20Q-50-8 0 14T100 6V100H-100Z" fill="#cf7c52"/>
+  <path d="M-100 48Q-40 22 20 44T100 36V100H-100Z" fill="#b95f38"/>
+  <path d="M-100 76Q-30 56 40 74T100 68V100H-100Z" fill="#a14e2b"/>
+  <ellipse cx="-58" cy="-26" rx="20" ry="8" fill="#7d3a1c"/><ellipse cx="-58" cy="-28" rx="16" ry="5.5" fill="#5f2b14"/>
+  <use href="#brickpile" transform="translate(-58 40) scale(.95)"/>
+  <use href="#brickpile" transform="translate(62 -4) scale(.9)"/>
+  <use href="#brickpile" transform="translate(48 64) scale(.85)"/>
+  <path d="M30-44h14v-10h-14zM30-44q7-12 14 0" fill="#8b3d1d" stroke="#e8b095" stroke-width="1"/>
+</g>
+<g id="t-mountains">
+  <rect x="-100" y="-100" width="200" height="200" fill="url(#gr-mountains)"/>
+  <path d="M-100 8-66-30-34 8-8-24 20 8 52-36 100 20V100H-100Z" fill="#a4aebc"/>
+  <path d="M-96 66-48-30 2 66Z" fill="#6a7484"/><path d="M-48-30 2 66H-18L-44-6Z" fill="#8995a6"/>
+  <path d="M-48-30-60-6-52-12-46-2-39-12-32-4Z" fill="#fff"/>
+  <path d="M-16 66 38-46 98 66Z" fill="#788292"/><path d="M38-46 98 66H70L40-8Z" fill="#8f9bac"/>
+  <path d="M38-46 25-18 33-23 40-12 47-23 56-14Z" fill="#fff"/>
+  <path d="M-100 62Q-40 48 20 64T100 58V100H-100Z" fill="#5e6978"/>
+  <use href="#pine" transform="translate(-72 70) scale(.42)"/><use href="#pine" transform="translate(-58 76) scale(.34)"/><use href="#pine" transform="translate(66 74) scale(.4)"/>
+</g>
+<g id="t-desert">
+  <rect x="-100" y="-100" width="200" height="200" fill="url(#gr-desert)"/>
+  <path d="M-100 26Q-50-4 0 24T100 16V100H-100Z" fill="#ead898"/>
+  <path d="M-100 62Q-30 38 40 64T100 56V100H-100Z" fill="#d6bc76"/>
+  <path d="M-90 40Q-60 28-30 40M20 50Q50 38 84 50M-30 -34Q0-44 30-34" fill="none" stroke="#fff" stroke-opacity=".4" stroke-width="2.4" stroke-linecap="round"/>
+  <use href="#cactus" transform="translate(-60 40) scale(.85)"/>
+  <use href="#cactus" transform="translate(66 -10) scale(.6)"/>
+  <circle cx="60" cy="-60" r="9" fill="#fff4bb" opacity=".8"/>
+</g>
