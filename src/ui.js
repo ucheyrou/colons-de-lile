@@ -42,7 +42,7 @@
   const ui = {
     screen: 'menu', pin: null, mode: null, tradeOpen: false, tab: 'bank', bankGive: null, bankGet: null,
     give: zero(), want: zero(), discard: zero(), pick: null, yop: [], toast: '', confirmNew: false,
-    count: 3, names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: '', lastTurn: -1,
+    count: 3, names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: '', lastTurn: -1, fxKey: null, fx: null, fxNow: null, fxTimer: 0, gain: null, gainTimer: 0, lastHand: null,
     code: '', joinCode: '', myName: '', error: '', busy: false,
     seat: -1, boardSeed: null, board: null, conn: 'searching', lobby: [], pending: 0, phoneTab: 'hand', needBoard: false, wasNeed: false, wasMine: false,
   };
@@ -144,7 +144,8 @@
         '</g>');
     });
 
-    b.hexes.forEach((h) => {
+    const hexMarkup = (h) => {
+      const out = [];
       const pts = h.vertices.map((v) => X(b.vertices[v].x) + ',' + X(b.vertices[v].y)).join(' ');
       const cx = X(h.x), cy = X(h.y);
       const g = GLYPH[h.terrain];
@@ -164,7 +165,9 @@
       } else {
         out.push('<circle cx="' + cx + '" cy="' + (cy - 4) + '" r="26" fill="#fffaf0" fill-opacity=".9"/><use href="#g-' + g + '" x="' + (cx - 22) + '" y="' + (cy - 26) + '" width="44" height="44"/>');
       }
-    });
+      return out.join('');
+    };
+    b.hexes.forEach((h) => out.push('<g class="bh">' + hexMarkup(h) + '</g>'));
 
     Object.keys(s.roads).forEach((k) => {
       const e = b.edges[+k], A = b.vertices[e.a], B = b.vertices[e.b];
@@ -173,6 +176,13 @@
       out.push('<line x1="' + ax + '" y1="' + ay + '" x2="' + bx + '" y2="' + by + '" stroke="#1b1b1b" stroke-width="15" stroke-linecap="round"/>');
       out.push('<line x1="' + ax + '" y1="' + ay + '" x2="' + bx + '" y2="' + by + '" stroke="' + pcolor(s.roads[k]) + '" stroke-width="9" stroke-linecap="round"/>');
     });
+
+    const fx = ui.fxNow;
+    const ringPts = (h) => h.vertices.map((v) => X(b.vertices[v].x) + ',' + X(b.vertices[v].y)).join(' ');
+    if (fx) {
+      fx.blocked.forEach((id) => out.push('<polygon class="fx-block" points="' + ringPts(b.hexes[id]) + '"/>'));
+      fx.hexes.forEach((id) => out.push('<g class="fx-hex">' + hexMarkup(b.hexes[id]) + '<polygon class="fx-ring" points="' + ringPts(b.hexes[id]) + '"/></g>'));
+    }
 
     tg.hexes.forEach((id) => {
       const h = b.hexes[id];
@@ -200,7 +210,56 @@
 
     const rh = b.hexes[s.robber];
     out.push('<g transform="translate(' + (X(rh.x) + 44) + ' ' + (X(rh.y) + 4) + ')" pointer-events="none"><path d="M-14 22Q-14-6 0-9Q14-6 14 22Z" fill="#23262b" stroke="#fffaf0" stroke-width="3"/><circle cy="-22" r="11" fill="#23262b" stroke="#fffaf0" stroke-width="3"/></g>');
+    if (fx) {
+      fx.gains.forEach((g, i) => {
+        const v = b.vertices[g.vertex];
+        out.push('<g transform="translate(' + X(v.x) + ' ' + (X(v.y) - 44) + ')" pointer-events="none"><g class="fx-gain" style="--d:' + (650 + i * 140) + 'ms">' +
+          '<rect x="-52" y="-26" width="104" height="52" rx="26" fill="var(--surface)" stroke="' + pcolor(g.owner) + '" stroke-width="6"/>' +
+          '<use href="#g-' + g.res + '" x="-44" y="-19" width="38" height="38"/>' +
+          '<text x="14" y="9" font-size="30" font-weight="800" font-family="var(--f-display)" fill="var(--ink)">+' + g.n + '</text></g></g>');
+      });
+    }
     return out.join('');
+  }
+
+  function resetFx() { ui.fxKey = null; ui.fx = null; ui.fxNow = null; ui.gain = null; ui.lastHand = null; }
+
+  // ---------- Animation du lancer : les tuiles qui produisent passent au premier plan ----------
+  const FX_MS = 4200;
+  function computeFx(s) {
+    const sum = s.dice[0] + s.dice[1];
+    const same = s.board.hexes.filter((h) => h.number === sum);
+    const hexes = same.filter((h) => h.id !== s.robber);
+    const gains = {};
+    hexes.forEach((h) => {
+      const res = E.TERRAIN_RES[h.terrain];
+      h.vertices.forEach((v) => {
+        const b = s.buildings[v];
+        if (!b) return;
+        const k = v + ':' + res;
+        gains[k] = gains[k] || { vertex: v, owner: b.owner, res, n: 0 };
+        gains[k].n += b.type === 'city' ? 2 : 1;
+      });
+    });
+    return { sum, hexes: hexes.map((h) => h.id), blocked: same.filter((h) => h.id === s.robber).map((h) => h.id), terrains: hexes.map((h) => h.terrain), gains: Object.keys(gains).map((k) => gains[k]), t: Date.now() };
+  }
+  // Détecte un nouveau lancer ; un jeu chargé ou rejoint en cours de route n'anime rien.
+  function trackRoll() {
+    const s = game;
+    const key = s.dice ? s.turnNo + ':' + s.dice.join(',') : '';
+    if (ui.fxKey === null) { ui.fxKey = key; return; }
+    if (key && key !== ui.fxKey) {
+      ui.fxKey = key;
+      ui.fx = computeFx(s);
+      clearTimeout(ui.fxTimer);
+      ui.fxTimer = setTimeout(render, FX_MS + 80);
+    } else if (!key) ui.fxKey = '';
+  }
+  function activeFx() {
+    if (!ui.fx) return null;
+    const elapsed = Date.now() - ui.fx.t;
+    if (elapsed >= FX_MS) { ui.fx = null; return null; }
+    return Object.assign({}, ui.fx, { elapsed });
   }
 
   function bannerHTML() {
@@ -222,8 +281,14 @@
       ui.diceKey = key;
       dice = '<div class="dice' + (fresh ? ' rolled' : '') + '" aria-label="Dés"><span class="die">' + s.dice[0] + '</span><span class="die">' + s.dice[1] + '</span><span class="sum">' + (s.dice[0] + s.dice[1]) + '</span></div>';
     }
+    let cap = '';
+    if (ui.fxNow && ui.fxNow.sum !== 7) {
+      cap = '<div class="fxcap">' + (ui.fxNow.hexes.length
+        ? 'Produisent : ' + ui.fxNow.terrains.map((tr) => icon(GLYPH[tr], 'mini')).join('')
+        : 'Aucune tuile ne produit') + (ui.fxNow.blocked.length ? ' <b>· bloquée par le voleur</b>' : '') + '</div>';
+    }
     const cancel = mode === 'client' && ui.mode ? '<button class="btn small" data-act="mode" data-k="' + ui.mode + '">Annuler</button>' : '';
-    return '<div class="say"><span class="dot" style="--pc:' + pcolor(s.turn) + '"></span>' + esc(txt) + '</div>' + cancel + dice;
+    return '<div class="say"><span class="dot" style="--pc:' + pcolor(s.turn) + '"></span>' + esc(txt) + '</div>' + cancel + dice + cap;
   }
 
   // ---------- Scores ----------
@@ -330,6 +395,24 @@
       (s.trade && s.trade.from !== v && s.trade.responses[v] === undefined && s.phase === 'main'));
   }
 
+  // Cartes reçues : on compare la main à celle du rendu précédent (même joueur affiché).
+  function trackGain() {
+    if (mode === 'host') return;
+    const v = viewer(), me = game.players[v];
+    if (!me || !me.hand) return;
+    const prev = ui.lastHand;
+    ui.lastHand = { seat: v, hand: Object.assign({}, me.hand) };
+    if (!prev || prev.seat !== v) return;
+    const d = {};
+    let any = false;
+    RES.forEach((r) => { if (me.hand[r] > prev.hand[r]) { d[r] = me.hand[r] - prev.hand[r]; any = true; } });
+    if (any) {
+      ui.gain = { d, t: Date.now() };
+      clearTimeout(ui.gainTimer);
+      ui.gainTimer = setTimeout(renderHand, 3000);
+    }
+  }
+
   function handHTML() {
     const s = game, v = viewer();
     const me = s.players[v];
@@ -341,13 +424,17 @@
     }).join('') + '</div>' : '';
     let html = '<div class="hand-head"><span class="dot" style="--pc:' + pcolor(v) + '"></span><h2>' + (mode === 'client' ? esc(me.name) : 'Main de ' + esc(me.name)) + '</h2>' +
       (ui.pending ? '<span class="sending" aria-label="Envoi en cours">…</span>' : '') +
+      (mode === 'client' && s.dice ? '<span class="dicechip" aria-label="Dés">' + s.dice[0] + ' + ' + s.dice[1] + ' = <b>' + (s.dice[0] + s.dice[1]) + '</b></span>' : '') +
       '<span class="vp">' + E.points(s, v, true) + '<small>pts</small></span></div>' + chips +
       '<p class="hint' + (hint.go ? ' go' : '') + '" role="status">' + esc(hint.t) + '</p>';
 
     html += incomingOffer(s, v);
 
-    html += '<div class="tiles" aria-label="Ressources">' + RES.map((r) =>
-      '<div class="tile' + (me.hand[r] ? '' : ' zero') + '">' + icon(r) + '<b>' + me.hand[r] + '</b><span>' + NAME[r] + '</span></div>').join('') + '</div>';
+    const gElapsed = ui.gain ? Date.now() - ui.gain.t : 99999;
+    html += '<div class="tiles" aria-label="Ressources">' + RES.map((r) => {
+      const gained = gElapsed < 2800 && ui.gain.d[r];
+      return '<div class="tile' + (me.hand[r] ? '' : ' zero') + (gained ? ' gain' : '') + '"' + (gained ? ' style="--gd:-' + gElapsed + 'ms"' : '') + '>' + (gained ? '<i class="plus">+' + gained + '</i>' : '') + icon(r) + '<b>' + me.hand[r] + '</b><span>' + NAME[r] + '</span></div>';
+    }).join('') + '</div>';
 
     if (av.roll) html += '<button class="btn primary big" data-act="roll">Lancer les dés</button>';
     if (av.discard) {
@@ -532,7 +619,12 @@
     const g = $('game');
     g.className = 'layout ' + mode;
     if (mode === 'local' && game.turn !== ui.lastTurn) { ui.pin = null; ui.lastTurn = game.turn; }
+    trackRoll();
+    trackGain();
+    ui.fxNow = activeFx();
     $('board').innerHTML = boardHTML();
+    $('board').setAttribute('class', ui.fxNow ? 'fx-on' : '');
+    if (ui.fxNow) $('board').style.setProperty('--el', '-' + ui.fxNow.elapsed + 'ms');
     if (mode === 'client') {
       const mine = needsMe(game, ui.seat);
       if (ui.needBoard && !ui.wasNeed) ui.phoneTab = 'board';
@@ -567,6 +659,7 @@
     }
     game = E.newGame({ names, seed: newSeed() });
     mode = 'local';
+    resetFx();
     ui.pin = null; ui.mode = null; ui.lastTurn = -1; ui.diceKey = ''; ui.tradeOpen = false; ui.confirmNew = false;
     save();
     render();
@@ -606,6 +699,7 @@
       if (saved) {
         game = fat(saved.game);
         mode = 'host';
+        resetFx();
         hostNet.setStatus('play');
         ui.lastTurn = -1;
         render();
@@ -632,6 +726,7 @@
     players.forEach((p, i) => { seats[p.pub] = i; });
     hostNet.setSeats(seats);
     mode = 'host';
+    resetFx();
     ui.lastTurn = -1; ui.diceKey = '';
     save();
     hostNet.setStatus('play');
@@ -691,6 +786,7 @@
     }
   }
   function onPhoneView(p) {
+    if (!game) resetFx();
     const view = p.view;
     if (ui.boardSeed !== view.seed || !ui.board) { ui.board = E.boardFromSeed(view.seed); ui.boardSeed = view.seed; }
     view.board = ui.board;
@@ -715,7 +811,7 @@
     join: joinGame,
     leave: leaveGame,
     start: startLocal,
-    resume: () => { const g = store.get(SAVE_KEY); if (validGame(g)) { game = fat(g); mode = 'local'; ui.lastTurn = -1; render(); } },
+    resume: () => { const g = store.get(SAVE_KEY); if (validGame(g)) { game = fat(g); mode = 'local'; resetFx(); ui.lastTurn = -1; render(); } },
     count: (t) => { ui.names.forEach((n, i) => { const el = $('name' + i); if (el) ui.names[i] = el.value; }); ui.count = +t.dataset.n; renderWelcome(); },
     new: () => { ui.confirmNew = true; renderTop(); },
     'new-cancel': () => { ui.confirmNew = false; renderTop(); },

@@ -38,6 +38,7 @@ node test/simulate.mjs 200   # 200 parties aléatoires, vérifie les invariants
 node test/e2e.mjs            # écran + 3 téléphones en jsdom (jsdom requis : npm i --no-save jsdom) ; ajouter --site pour un vrai courtier
 node test/mqtt-live.mjs      # client MQTT contre les courtiers publics (réseau)
 node test/net-live.mjs       # hôte + 2 téléphones chiffrés par Internet
+node test/fx.mjs             # animation du lancer (jsdom)
 ```
 Ne publie l'artefact qu'après `node --test` et `node build.mjs` verts.
 
@@ -91,6 +92,13 @@ Un agent qui découvre un bug dans le fichier d'un autre le signale (message ou 
 - L'hôte répond aux téléphones avant de redessiner son écran, et sert d'abord celui qui vient d'agir.
 - Après une erreur de règle, l'hôte renvoie la vue pour annuler l'affichage anticipé.
 - Zones de toucher : disques invisibles (`.hit`) bien plus larges que le point affiché + aimant sur l'emplacement valide le plus proche (`snapTap`). Sur téléphone le plateau est réduit à ~0,3 px par unité : toute cible de moins de ~130 unités est trop petite pour un doigt.
+
+## Animation du lancer (src/ui.js, src/style.css)
+- À chaque nouveau lancer (`trackRoll`) : les tuiles qui produisent sont redessinées au premier plan (`.fx-hex`), le reste s'estompe (`#board.fx-on`), des « +n » montent au-dessus des colonies (`.fx-gain`), la tuile bloquée par le voleur est cerclée de rouge (`.fx-block`). Durée `FX_MS` = 4,2 s.
+- Les animations CSS sont recalées par `--el` (temps écoulé) : un nouveau rendu en cours d'animation ne la relance pas. Ne pas la déclencher depuis `render()` sans passer par `trackRoll`.
+- Une partie chargée, reprise ou rejointe en cours de route n'anime rien (`ui.fxKey === null` au départ, `resetFx`).
+- Main du joueur : `trackGain` compare la main au rendu précédent et anime les cartes reçues (`.tile.gain`, `.plus`).
+- Test : `node test/fx.mjs` (jsdom).
 
 ## Réseau (src/net.js)
 - Hôte autoritaire : seul l'écran du plateau détient l'état réel. Les téléphones envoient `{type, ...}` chiffré sur le sujet `a` ; l'hôte impose le siège (`player` n'est jamais cru) et répond sur `v`.
