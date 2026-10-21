@@ -167,8 +167,8 @@ h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
 .dice.rolled .die { animation: tumble .45s ease-out; }
 @keyframes tumble { 0% { transform: rotate(-80deg) scale(.6); } 60% { transform: rotate(14deg) scale(1.1); } 100% { transform: none; } }
 
-.tgt { fill: var(--accent); fill-opacity: .35; stroke: #fff; stroke-width: 4; cursor: pointer; animation: pulse 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-.tgt-e { stroke: #fff; stroke-opacity: .85; stroke-width: 18; stroke-linecap: round; cursor: pointer; animation: glow 1.4s ease-in-out infinite; }
+.tgt { fill: var(--accent); fill-opacity: .55; stroke: #fff; stroke-width: 6; pointer-events: none; animation: pulse 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.tgt-e { stroke: #fff; stroke-opacity: .9; stroke-width: 26; stroke-linecap: round; pointer-events: none; animation: glow 1.4s ease-in-out infinite; }
 .tgt-h { fill: #000; fill-opacity: 0; cursor: pointer; }
 .tgt-h:hover { fill-opacity: .22; }
 .tgt-h-ring { fill: none; stroke: #fff; stroke-width: 6; stroke-dasharray: 14 10; pointer-events: none; }
@@ -355,6 +355,11 @@ body.is-client { padding-bottom: 84px; }
 .nav-btn .alert { position: absolute; top: 6px; right: 10px; width: 11px; height: 11px; border-radius: 50%; background: var(--warn); border: 2px solid var(--surface); }
 body.is-client .brand h1 { font-size: 19px; white-space: nowrap; }
 body.is-client .top { margin-bottom: 8px; }
+
+/* Zones de toucher invisibles, bien plus larges que le point affiché (un écran de téléphone réduit le plateau à ~0,3 px par unité). */
+.hit { fill: transparent; stroke: none; cursor: pointer; }
+.hit-e { stroke: transparent; stroke-width: 84; stroke-linecap: round; }
+#board { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 
 </style>
 
@@ -856,7 +861,7 @@ body.is-client .top { margin-bottom: 8px; }
     let n = buildingsOf(s, pid, 'settlement') + 2 * buildingsOf(s, pid, 'city');
     if (s.longestRoad.holder === pid) n += 2;
     if (s.largestArmy.holder === pid) n += 2;
-    if (withHidden) n += s.players[pid].dev.filter((c) => c.k === 'vp').length;
+    if (withHidden) n += (s.players[pid].dev || []).filter((c) => c.k === 'vp').length;
     return n;
   }
 
@@ -1380,10 +1385,11 @@ body.is-client .top { margin-bottom: 8px; }
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
+  // Connexion simultanée aux deux : le plus rapide gagne, l'autre sert de secours.
+  // (test.mosquitto.org a été écarté : connexions et testaments trop irréguliers.)
   const BROKERS = [
-    'wss://broker.emqx.io:8084/mqtt',
     'wss://broker.hivemq.com:8884/mqtt',
-    'wss://test.mosquitto.org:8081',
+    'wss://broker.emqx.io:8084/mqtt',
   ];
   const PREFIX = 'colons-v1';
   const KEEPALIVE = 30;
@@ -1481,6 +1487,9 @@ body.is-client .top { margin-bottom: 8px; }
   }
 
   // ---------- Salon ----------
+  // On se connecte à tous les courtiers en même temps et on envoie chaque message sur tous :
+  // le premier arrivé gagne (donc le plus rapide), les doublons sont ignorés, et si l'un tombe un autre prend le relais.
+  // Écran et téléphones se retrouvent même si un courtier a refusé l'un d'eux.
   async function join(code, opts) {
     const o = opts || {};
     const WS = o.WebSocket || (typeof WebSocket !== 'undefined' ? WebSocket : null);
@@ -1491,17 +1500,21 @@ body.is-client .top { margin-bottom: 8px; }
     const peerId = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => (b % 36).toString(36)).join('');
     const willTopic = base + '/p/' + peerId;
 
-    let ws = null, up = false, closed = false, brokerIndex = 0, subId = 1, retry = 0;
-    let presence = {}, presenceTimer = 0, pingTimer = 0, beatTimer = 0, sweepTimer = 0;
+    let closed = false, subId = 1, seq = 0;
+    let presence = {}, presenceTimer = 0, beatTimer = 0, sweepTimer = 0;
     const topics = new Map();
     const peerHandlers = new Set();
     const connHandlers = new Set();
     const seen = new Map(); // id -> {presence, updatedAt, seenAt}
+    const heard = new Set(); // doublons d'événements (même message reçu par plusieurs courtiers)
     let pending = { joined: new Set(), updated: new Set(), left: new Set() };
     let flushing = false;
+    let selfUpdated = Date.now();
 
     const now = () => Date.now();
-    const send = (bytes) => { if (up && ws && ws.readyState === 1) ws.send(bytes); };
+    const links = brokers.map((url) => ({ url, ws: null, up: false, retry: 0, ping: 0, timer: 0 }));
+    const anyUp = () => links.some((l) => l.up);
+    const send = (bytes) => links.forEach((l) => { if (l.up && l.ws && l.ws.readyState === 1) l.ws.send(bytes); });
 
     const snapshot = () => {
       const t = now();
@@ -1511,7 +1524,6 @@ body.is-client .top { margin-bottom: 8px; }
       });
       return list;
     };
-    let selfUpdated = now();
 
     function flush() {
       if (flushing) return;
@@ -1537,7 +1549,7 @@ body.is-client .top { margin-bottom: 8px; }
       if (!obj || typeof obj.v !== 'object' || obj.v === null) return;
       const prev = seen.get(id);
       const changed = !prev || JSON.stringify(prev.presence) !== JSON.stringify(obj.v);
-      seen.set(id, { presence: Object.freeze(obj.v), updatedAt: changed ? now() : prev.updatedAt, seenAt: now() });
+      seen.set(id, { presence: changed ? Object.freeze(obj.v) : prev.presence, updatedAt: changed ? now() : prev.updatedAt, seenAt: now() });
       if (!prev) pending.joined.add(id);
       else if (changed) pending.updated.add(id);
       else return;
@@ -1547,6 +1559,12 @@ body.is-client .top { margin-bottom: 8px; }
       let obj;
       try { obj = JSON.parse(dec.decode(payload)); } catch (e) { return; }
       if (!obj || typeof obj.p !== 'string') return;
+      if (obj.n !== undefined) {
+        const key = obj.p + ':' + obj.n;
+        if (heard.has(key)) return;
+        heard.add(key);
+        if (heard.size > 800) heard.delete(heard.values().next().value);
+      }
       const hs = topics.get(topic);
       if (!hs) return;
       const msg = { topic, data: obj.d, peer: obj.p, by: null, isMe: obj.p === peerId, sameTab: obj.p === peerId, kind: 'viewer', guest: false };
@@ -1561,42 +1579,42 @@ body.is-client .top { margin-bottom: 8px; }
       else if (rel.startsWith('e/')) onEvent(rel.slice(2), m.payload);
     }
 
-    function publishPresence() {
-      send(publishPacket(willTopic, enc.encode(JSON.stringify({ t: now(), v: presence })), true));
-    }
+    const presenceBytes = () => publishPacket(willTopic, enc.encode(JSON.stringify({ t: now(), v: presence })), true);
+    const publishPresence = () => send(presenceBytes());
 
-    async function connect() {
-      let lastErr = null;
-      for (let k = 0; k < brokers.length; k++) {
-        const i = (brokerIndex + k) % brokers.length;
-        try {
-          const c = await openSocket(brokers[i], peerId, willTopic, WS);
-          brokerIndex = i;
-          ws = c.ws;
-          up = true;
-          retry = 0;
-          const reader = c.reader;
-          ws.onmessage = (ev) => reader.push(new Uint8Array(ev.data)).forEach(onPacket);
-          c.pending.forEach(onPacket);
-          ws.onclose = () => { up = false; connHandlers.forEach((h) => h(false)); if (!closed) reconnect(); };
-          ws.onerror = () => {};
-          send(subscribePacket(subId++, base + '/#'));
-          publishPresence();
-          clearInterval(pingTimer);
-          pingTimer = setInterval(() => send(PING), (KEEPALIVE * 1000) / 2);
-          connHandlers.forEach((h) => h(true));
-          return;
-        } catch (e) { lastErr = e; }
-      }
-      throw lastErr || new Error('aucun courtier joignable');
-    }
-    function reconnect() {
+    async function connectLink(l) {
       if (closed) return;
-      const wait = Math.min(10000, 800 * 2 ** retry++);
-      setTimeout(() => { if (!closed) connect().catch(reconnect); }, wait);
+      try {
+        const c = await openSocket(l.url, peerId, willTopic, WS);
+        if (closed) { try { c.ws.close(); } catch (e) { /* ignore */ } return; }
+        l.ws = c.ws; l.up = true; l.retry = 0;
+        const reader = c.reader;
+        l.ws.onmessage = (ev) => reader.push(new Uint8Array(ev.data)).forEach(onPacket);
+        c.pending.forEach(onPacket);
+        l.ws.onclose = () => { l.up = false; clearInterval(l.ping); connHandlers.forEach((h) => h(anyUp())); if (!closed) retryLink(l); };
+        l.ws.onerror = () => {};
+        l.ws.send(subscribePacket(subId++, base + '/#'));
+        l.ws.send(presenceBytes());
+        clearInterval(l.ping);
+        l.ping = setInterval(() => { if (l.up && l.ws.readyState === 1) l.ws.send(PING); }, (KEEPALIVE * 1000) / 2);
+        connHandlers.forEach((h) => h(true));
+      } catch (e) { if (!closed) retryLink(l); throw e; }
+    }
+    function retryLink(l) {
+      if (closed) return;
+      const wait = Math.min(15000, 1000 * 2 ** l.retry++);
+      l.timer = setTimeout(() => { connectLink(l).catch(() => {}); }, wait);
     }
 
-    await connect();
+    // On démarre tous les courtiers ; on attend le premier qui répond (ou l'échec de tous).
+    await new Promise((resolve, reject) => {
+      let failures = 0, ok = false;
+      links.forEach((l) => {
+        connectLink(l).then(() => { if (!ok) { ok = true; resolve(); } }, () => {
+          if (++failures === links.length && !ok) reject(new Error('aucun courtier joignable'));
+        });
+      });
+    }).catch((e) => { closed = true; links.forEach((l) => { clearTimeout(l.timer); try { l.ws && l.ws.close(); } catch (x) { /* ignore */ } }); throw e; });
 
     beatTimer = setInterval(() => publishPresence(), 15000);
     sweepTimer = setInterval(() => {
@@ -1605,15 +1623,20 @@ body.is-client .top { margin-bottom: 8px; }
       if (pending.left.size) flush();
     }, 10000);
 
+    const shutdown = () => {
+      closed = true;
+      clearInterval(beatTimer); clearInterval(sweepTimer); clearTimeout(presenceTimer);
+      links.forEach((l) => { clearInterval(l.ping); clearTimeout(l.timer); });
+    };
     return {
       name: room,
       peerId,
-      broker: () => brokers[brokerIndex],
-      connected: () => up,
-      onConnection(h) { connHandlers.add(h); Promise.resolve().then(() => h(up)); return () => connHandlers.delete(h); },
+      brokers: () => links.filter((l) => l.up).map((l) => l.url),
+      connected: anyUp,
+      onConnection(h) { connHandlers.add(h); Promise.resolve().then(() => h(anyUp())); return () => connHandlers.delete(h); },
       async emit(topic, data) {
-        if (!up) return;
-        send(publishPacket(base + '/e/' + topic, enc.encode(JSON.stringify({ p: peerId, d: data })), false));
+        if (!anyUp()) return;
+        send(publishPacket(base + '/e/' + topic, enc.encode(JSON.stringify({ p: peerId, n: ++seq, d: data })), false));
       },
       on(topic, handler) {
         if (!topics.has(topic)) topics.set(topic, new Set());
@@ -1636,13 +1659,13 @@ body.is-client .top { margin-bottom: 8px; }
       },
       async leave() {
         if (closed) return;
-        closed = true;
-        clearInterval(pingTimer); clearInterval(beatTimer); clearInterval(sweepTimer); clearTimeout(presenceTimer);
         send(publishPacket(willTopic, new Uint8Array(0), true));
-        try { send(Uint8Array.of(0xe0, 0)); ws.close(); } catch (e) { /* ignore */ }
+        send(Uint8Array.of(0xe0, 0));
+        shutdown();
+        links.forEach((l) => { try { l.ws && l.ws.close(); } catch (e) { /* ignore */ } });
       },
-      // Pour les tests : coupe la liaison sans prévenir, comme un onglet fermé.
-      _drop() { closed = true; clearInterval(pingTimer); clearInterval(beatTimer); clearInterval(sweepTimer); try { ws.close(); } catch (e) { /* ignore */ } },
+      // Pour les tests : coupe tout sans prévenir, comme un onglet fermé.
+      _drop() { shutdown(); links.forEach((l) => { try { l.ws && l.ws.close(); } catch (e) { /* ignore */ } }); },
     };
   }
 
@@ -1752,6 +1775,7 @@ body.is-client .top { margin-bottom: 8px; }
     let seats = Object.assign({}, opts.seats || {});
     let version = opts.version || 0;
     let status = 'lobby';
+    let actorPub = null;
     const seen = [];
     const noteSeen = () => playersOf(room).forEach((p) => { if (!seen.includes(p.presence.pub)) seen.push(p.presence.pub); });
     let chain = Promise.resolve();
@@ -1812,8 +1836,13 @@ body.is-client .top { margin-bottom: 8px; }
         try { payload = await open(await keyFor(pub), text); } catch (e) { return; }
         if (!payload || !(payload.n > (lastN.get(pub) || 0)) || !payload.action) return;
         lastN.set(pub, payload.n);
+        actorPub = pub;
         const err = opts.onAct(seats[pub], payload.action);
-        if (err) await toPeer(peer, { k: 'err', n: payload.n, error: err });
+        actorPub = null;
+        if (err) {
+          await toPeer(peer, { k: 'err', n: payload.n, error: err });
+          await sendView(peer); // annule l'affichage anticipé du téléphone
+        }
       });
     });
 
@@ -1833,7 +1862,11 @@ body.is-client .top { margin-bottom: 8px; }
       publish() {
         version++;
         room.presence({ v: version });
-        playersOf(room).forEach((p) => { if (seats[p.presence.pub] !== undefined) q(() => sendView(p)); });
+        const first = actorPub; // celui qui vient d'agir est servi en premier
+        playersOf(room)
+          .filter((p) => seats[p.presence.pub] !== undefined)
+          .sort((a, b) => (b.presence.pub === first) - (a.presence.pub === first))
+          .forEach((p) => q(() => sendView(p)));
       },
       version: () => version,
       close() { clearInterval(resync); offPeers(); offAct(); room.presence({ r: null, pub: null, v: null, st: null }); },
@@ -1906,6 +1939,8 @@ body.is-client .top { margin-bottom: 8px; }
         return n;
       },
       status: () => status,
+      // Redemande la vue à l'hôte (l'affichage anticipé n'a pas été confirmé).
+      resync() { room.presence({ v: -1, n: ++nudge }); },
       close() { clearInterval(nudger); offPeers(); offView(); room.presence({ r: null, pub: null, name: null, v: null, n: null }); },
     };
   }
@@ -2005,12 +2040,23 @@ body.is-client .top { margin-bottom: 8px; }
     toastTimer = setTimeout(() => { ui.toast = ''; renderHand(); }, 3500);
     renderHand();
   }
+  // Actions que le téléphone peut montrer tout de suite : elles ne dépendent d'aucun secret (dés, pioche, main des autres).
+  // L'hôte tranche ; sa vue remplace de toute façon l'affichage anticipé.
+  const ANTICIPATED = new Set(['placeSettlement', 'placeRoad', 'placeCity', 'endTurn', 'bankTrade', 'discard', 'offerTrade', 'cancelTrade', 'respondTrade']);
+  function anticipate(action) {
+    if (!ANTICIPATED.has(action.type)) return;
+    try {
+      const r = E.apply(game, Object.assign({}, action, { player: ui.seat }));
+      if (r.ok) { r.state.board = ui.board; game = r.state; }
+    } catch (e) { /* vue incomplète : on attend l'hôte */ }
+  }
   function sendFromPhone(action) {
     if (!clientNet || !game) return false;
     const id = ++ui.pending;
     afterAction(action);
+    anticipate(action);
     clientNet.send(Object.assign({}, action, { player: ui.seat })).catch(() => { ui.pending = 0; say('Écran hors ligne.'); });
-    setTimeout(() => { if (ui.pending === id) { ui.pending = 0; say('L\'écran n\'a pas répondu, réessaie.'); } }, 5000);
+    setTimeout(() => { if (ui.pending === id) { ui.pending = 0; clientNet.resync(); say('L\'écran n\'a pas répondu, resynchronisation…'); } }, 4000);
     render();
     return true;
   }
@@ -2087,7 +2133,8 @@ body.is-client .top { margin-bottom: 8px; }
     });
     tg.edges.forEach((id) => {
       const e = b.edges[id], A = b.vertices[e.a], B = b.vertices[e.b];
-      out.push('<line class="tgt-e" data-e="' + id + '" x1="' + X(A.x + (B.x - A.x) * 0.16) + '" y1="' + X(A.y + (B.y - A.y) * 0.16) + '" x2="' + X(A.x + (B.x - A.x) * 0.84) + '" y2="' + X(A.y + (B.y - A.y) * 0.84) + '"/>');
+      const c = ' x1="' + X(A.x + (B.x - A.x) * 0.16) + '" y1="' + X(A.y + (B.y - A.y) * 0.16) + '" x2="' + X(A.x + (B.x - A.x) * 0.84) + '" y2="' + X(A.y + (B.y - A.y) * 0.84) + '"';
+      out.push('<line class="tgt-e"' + c + '/><line class="hit hit-e" data-e="' + id + '"' + c + '/>');
     });
 
     Object.keys(s.buildings).forEach((k) => {
@@ -2100,7 +2147,7 @@ body.is-client .top { margin-bottom: 8px; }
 
     tg.vertices.forEach((id) => {
       const v = b.vertices[id];
-      out.push('<circle class="tgt" data-v="' + id + '" cx="' + X(v.x) + '" cy="' + X(v.y) + '" r="17"/>');
+      out.push('<circle class="tgt" cx="' + X(v.x) + '" cy="' + X(v.y) + '" r="26"/><circle class="hit" data-v="' + id + '" cx="' + X(v.x) + '" cy="' + X(v.y) + '" r="58"/>');
     });
 
     const rh = b.hexes[s.robber];
@@ -2525,9 +2572,8 @@ body.is-client .top { margin-bottom: 8px; }
     const r = E.apply(game, Object.assign({}, action, { player: seat }));
     if (!r.ok) return r.error;
     game = r.state;
-    save();
-    render();
-    hostNet.publish();
+    hostNet.publish();                       // d'abord répondre aux téléphones…
+    setTimeout(() => { save(); render(); }, 0); // …puis redessiner l'écran
     return null;
   }
   function hostStart() {
@@ -2676,8 +2722,29 @@ body.is-client .top { margin-bottom: 8px; }
     else if (t.dataset.h !== undefined) dispatch({ type: 'moveRobber', player: pid, hex: +t.dataset.h });
   }
 
+  // Un doigt tombe rarement pile sur un point : on prend toujours l'emplacement valide le plus proche du toucher
+  // (jusqu'à ~100 unités, soit environ 30 px sur un téléphone), même quand deux zones se chevauchent.
+  function snapTap(e) {
+    const svg = $('board');
+    if (!game || mode === 'host' || !svg.createSVGPoint || !svg.getScreenCTM || !svg.getScreenCTM()) return false;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX; pt.y = e.clientY;
+    const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+    let best = null, bestD = 100;
+    svg.querySelectorAll('[data-v],[data-e]').forEach((el) => {
+      const x = el.dataset.v !== undefined ? +el.getAttribute('cx') : (+el.getAttribute('x1') + +el.getAttribute('x2')) / 2;
+      const y = el.dataset.v !== undefined ? +el.getAttribute('cy') : (+el.getAttribute('y1') + +el.getAttribute('y2')) / 2;
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (d < bestD) { bestD = d; best = el; }
+    });
+    if (!best) return false;
+    onBoardClick(best);
+    return true;
+  }
+
   document.addEventListener('click', (e) => {
     const t = e.target.closest('[data-act],[data-v],[data-e],[data-h]');
+    if (e.target.closest && e.target.closest('#board') && (!t || t.dataset.v !== undefined || t.dataset.e !== undefined) && snapTap(e)) return;
     if (!t) return;
     if (t.dataset.act) {
       const h = handlers[t.dataset.act];

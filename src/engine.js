@@ -307,7 +307,7 @@
     let n = buildingsOf(s, pid, 'settlement') + 2 * buildingsOf(s, pid, 'city');
     if (s.longestRoad.holder === pid) n += 2;
     if (s.largestArmy.holder === pid) n += 2;
-    if (withHidden) n += s.players[pid].dev.filter((c) => c.k === 'vp').length;
+    if (withHidden) n += (s.players[pid].dev || []).filter((c) => c.k === 'vp').length;
     return n;
   }
 

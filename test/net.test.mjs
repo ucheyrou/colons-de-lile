@@ -232,3 +232,43 @@ test('téléphone resté en salle d\'attente après la perte d\'un message « at
   ctx.hub.drop = 0;
   await until(() => ctx.phones.every((p) => p.got.status.includes('lobby')), 8000);
 });
+
+test('après une erreur, l\'hôte renvoie la vue : l\'affichage anticipé du téléphone est annulé', async () => {
+  const ctx = await setup(3);
+  await start(ctx);
+  const n = ctx.phones[1].got.views.length;
+  await ctx.phones[1].client.send({ type: 'roll' }); // pas son tour
+  await until(() => ctx.phones[1].got.errors.length > 0 && ctx.phones[1].got.views.length > n);
+});
+
+test('resync() : le téléphone redemande sa vue', async () => {
+  const ctx = await setup(2);
+  await start(ctx);
+  await wait(1700); // dépasse l'anti-rafale de l'hôte
+  const n = ctx.phones[0].got.views.length;
+  ctx.phones[0].client.resync();
+  await until(() => ctx.phones[0].got.views.length > n);
+});
+
+test('celui qui vient d\'agir reçoit sa vue en premier', async () => {
+  const ctx = await setup(3);
+  await start(ctx);
+  const order = [];
+  ctx.hub.rooms.get('colons-test').members.forEach((m) => {
+    m.topics.set('v', new Set([() => {}]));
+  });
+  const stamp = [];
+  ctx.phones.forEach((p, i) => p.room.on('v', (msg) => { if (msg.data.to === Net.fp(p.identity.pub)) stamp.push(i); }));
+  const v = E.available(ctx.getGame(), 0).targets.vertices[0];
+  await ctx.phones[0].client.send({ type: 'placeSettlement', vertex: v });
+  await until(() => stamp.length >= 3);
+  assert.equal(stamp[0], 0);
+  void order;
+});
+
+test('points() ne plante pas sur une vue sans les cartes cachées des autres', () => {
+  const s = E.newGame({ names: ['A', 'B', 'C'], seed: 3 });
+  const v = E.viewFor(s, 0, { board: false });
+  assert.doesNotThrow(() => E.points(v, 1, true));
+  assert.equal(E.points(v, 0, true), 0);
+});

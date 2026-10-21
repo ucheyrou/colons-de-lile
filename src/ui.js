@@ -88,12 +88,23 @@
     toastTimer = setTimeout(() => { ui.toast = ''; renderHand(); }, 3500);
     renderHand();
   }
+  // Actions que le téléphone peut montrer tout de suite : elles ne dépendent d'aucun secret (dés, pioche, main des autres).
+  // L'hôte tranche ; sa vue remplace de toute façon l'affichage anticipé.
+  const ANTICIPATED = new Set(['placeSettlement', 'placeRoad', 'placeCity', 'endTurn', 'bankTrade', 'discard', 'offerTrade', 'cancelTrade', 'respondTrade']);
+  function anticipate(action) {
+    if (!ANTICIPATED.has(action.type)) return;
+    try {
+      const r = E.apply(game, Object.assign({}, action, { player: ui.seat }));
+      if (r.ok) { r.state.board = ui.board; game = r.state; }
+    } catch (e) { /* vue incomplète : on attend l'hôte */ }
+  }
   function sendFromPhone(action) {
     if (!clientNet || !game) return false;
     const id = ++ui.pending;
     afterAction(action);
+    anticipate(action);
     clientNet.send(Object.assign({}, action, { player: ui.seat })).catch(() => { ui.pending = 0; say('Écran hors ligne.'); });
-    setTimeout(() => { if (ui.pending === id) { ui.pending = 0; say('L\'écran n\'a pas répondu, réessaie.'); } }, 5000);
+    setTimeout(() => { if (ui.pending === id) { ui.pending = 0; clientNet.resync(); say('L\'écran n\'a pas répondu, resynchronisation…'); } }, 4000);
     render();
     return true;
   }
@@ -170,7 +181,8 @@
     });
     tg.edges.forEach((id) => {
       const e = b.edges[id], A = b.vertices[e.a], B = b.vertices[e.b];
-      out.push('<line class="tgt-e" data-e="' + id + '" x1="' + X(A.x + (B.x - A.x) * 0.16) + '" y1="' + X(A.y + (B.y - A.y) * 0.16) + '" x2="' + X(A.x + (B.x - A.x) * 0.84) + '" y2="' + X(A.y + (B.y - A.y) * 0.84) + '"/>');
+      const c = ' x1="' + X(A.x + (B.x - A.x) * 0.16) + '" y1="' + X(A.y + (B.y - A.y) * 0.16) + '" x2="' + X(A.x + (B.x - A.x) * 0.84) + '" y2="' + X(A.y + (B.y - A.y) * 0.84) + '"';
+      out.push('<line class="tgt-e"' + c + '/><line class="hit hit-e" data-e="' + id + '"' + c + '/>');
     });
 
     Object.keys(s.buildings).forEach((k) => {
@@ -183,7 +195,7 @@
 
     tg.vertices.forEach((id) => {
       const v = b.vertices[id];
-      out.push('<circle class="tgt" data-v="' + id + '" cx="' + X(v.x) + '" cy="' + X(v.y) + '" r="17"/>');
+      out.push('<circle class="tgt" cx="' + X(v.x) + '" cy="' + X(v.y) + '" r="26"/><circle class="hit" data-v="' + id + '" cx="' + X(v.x) + '" cy="' + X(v.y) + '" r="58"/>');
     });
 
     const rh = b.hexes[s.robber];
@@ -608,9 +620,8 @@
     const r = E.apply(game, Object.assign({}, action, { player: seat }));
     if (!r.ok) return r.error;
     game = r.state;
-    save();
-    render();
-    hostNet.publish();
+    hostNet.publish();                       // d'abord répondre aux téléphones…
+    setTimeout(() => { save(); render(); }, 0); // …puis redessiner l'écran
     return null;
   }
   function hostStart() {
@@ -759,8 +770,29 @@
     else if (t.dataset.h !== undefined) dispatch({ type: 'moveRobber', player: pid, hex: +t.dataset.h });
   }
 
+  // Un doigt tombe rarement pile sur un point : on prend toujours l'emplacement valide le plus proche du toucher
+  // (jusqu'à ~100 unités, soit environ 30 px sur un téléphone), même quand deux zones se chevauchent.
+  function snapTap(e) {
+    const svg = $('board');
+    if (!game || mode === 'host' || !svg.createSVGPoint || !svg.getScreenCTM || !svg.getScreenCTM()) return false;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX; pt.y = e.clientY;
+    const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+    let best = null, bestD = 100;
+    svg.querySelectorAll('[data-v],[data-e]').forEach((el) => {
+      const x = el.dataset.v !== undefined ? +el.getAttribute('cx') : (+el.getAttribute('x1') + +el.getAttribute('x2')) / 2;
+      const y = el.dataset.v !== undefined ? +el.getAttribute('cy') : (+el.getAttribute('y1') + +el.getAttribute('y2')) / 2;
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (d < bestD) { bestD = d; best = el; }
+    });
+    if (!best) return false;
+    onBoardClick(best);
+    return true;
+  }
+
   document.addEventListener('click', (e) => {
     const t = e.target.closest('[data-act],[data-v],[data-e],[data-h]');
+    if (e.target.closest && e.target.closest('#board') && (!t || t.dataset.v !== undefined || t.dataset.e !== undefined) && snapTap(e)) return;
     if (!t) return;
     if (t.dataset.act) {
       const h = handlers[t.dataset.act];

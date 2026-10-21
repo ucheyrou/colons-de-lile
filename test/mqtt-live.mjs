@@ -49,4 +49,21 @@ for (const broker of MqttRoom.BROKERS) {
     console.log('ÉCHEC', name, '|', e.message);
   }
 }
-process.exit(failed === MqttRoom.BROKERS.length ? 1 : 0);
+// Multi-courtiers : un courtier mort ne gêne pas, et un message reçu par plusieurs courtiers n'est livré qu'une fois.
+try {
+  const c = code();
+  const dead = 'wss://localhost:1/mqtt';
+  const a = await MqttRoom.join(c, { brokers: [dead, ...MqttRoom.BROKERS] });
+  const b = await MqttRoom.join(c, { brokers: [...MqttRoom.BROKERS, dead] });
+  const got = [];
+  b.on('x', (m) => got.push(m.data));
+  await a.presence({ r: 'h' });
+  await until(() => b.peers().some((p) => p.presence.r === 'h'), 8000, 'présence malgré un courtier mort');
+  for (let i = 0; i < 5; i++) await a.emit('x', i);
+  await until(() => got.length >= 5, 8000, 'cinq messages');
+  await wait(1500);
+  if (got.join() !== '0,1,2,3,4' && got.slice().sort().join() !== '0,1,2,3,4') throw new Error('doublons ou pertes : ' + got.join());
+  console.log('OK    multi-courtiers | actifs :', a.brokers().length, 'courtier(s) | messages sans doublon :', got.length);
+  await a.leave(); await b.leave();
+} catch (e) { failed++; console.log('ÉCHEC multi-courtiers |', e.message); }
+process.exit(failed >= MqttRoom.BROKERS.length + 1 ? 1 : 0);

@@ -13,7 +13,7 @@ async function until(fn, ms = 10000, what = '') {
 const code = 'T' + Math.random().toString(36).slice(2, 5);
 
 const roomH = await MqttRoom.join(code);
-console.log('courtier :', roomH.broker());
+console.log('courtiers actifs :', roomH.brokers().length);
 let game = E.newGame({ names: ['Alice', 'Bruno'], seed: 11 });
 const host = Net.createHost({
   room: roomH, identity: await Net.newIdentity(),

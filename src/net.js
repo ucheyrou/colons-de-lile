@@ -99,6 +99,7 @@
     let seats = Object.assign({}, opts.seats || {});
     let version = opts.version || 0;
     let status = 'lobby';
+    let actorPub = null;
     const seen = [];
     const noteSeen = () => playersOf(room).forEach((p) => { if (!seen.includes(p.presence.pub)) seen.push(p.presence.pub); });
     let chain = Promise.resolve();
@@ -159,8 +160,13 @@
         try { payload = await open(await keyFor(pub), text); } catch (e) { return; }
         if (!payload || !(payload.n > (lastN.get(pub) || 0)) || !payload.action) return;
         lastN.set(pub, payload.n);
+        actorPub = pub;
         const err = opts.onAct(seats[pub], payload.action);
-        if (err) await toPeer(peer, { k: 'err', n: payload.n, error: err });
+        actorPub = null;
+        if (err) {
+          await toPeer(peer, { k: 'err', n: payload.n, error: err });
+          await sendView(peer); // annule l'affichage anticipé du téléphone
+        }
       });
     });
 
@@ -180,7 +186,11 @@
       publish() {
         version++;
         room.presence({ v: version });
-        playersOf(room).forEach((p) => { if (seats[p.presence.pub] !== undefined) q(() => sendView(p)); });
+        const first = actorPub; // celui qui vient d'agir est servi en premier
+        playersOf(room)
+          .filter((p) => seats[p.presence.pub] !== undefined)
+          .sort((a, b) => (b.presence.pub === first) - (a.presence.pub === first))
+          .forEach((p) => q(() => sendView(p)));
       },
       version: () => version,
       close() { clearInterval(resync); offPeers(); offAct(); room.presence({ r: null, pub: null, v: null, st: null }); },
@@ -253,6 +263,8 @@
         return n;
       },
       status: () => status,
+      // Redemande la vue à l'hôte (l'affichage anticipé n'a pas été confirmé).
+      resync() { room.presence({ v: -1, n: ++nudge }); },
       close() { clearInterval(nudger); offPeers(); offView(); room.presence({ r: null, pub: null, name: null, v: null, n: null }); },
     };
   }

@@ -45,7 +45,7 @@ Ne publie l'artefact qu'après `node --test` et `node build.mjs` verts.
 - Site : https://ucheyrou.github.io/colons-de-lile/ (dépôt public `ucheyrou/colons-de-lile`, Pages sur `main` dossier `/docs`).
 - Mise à jour : `node build.mjs`, puis commit de `docs/` et `git push`. Le site se reconstruit en une minute.
 - Les commits utilisent l'e-mail noreply GitHub (jamais l'adresse d'école de la config globale).
-- Sur le site, les téléphones passent par un courtier MQTT public (`src/mqtt-room.js`, courtiers en repli dans l'ordre). Le QR code ouvre `site#j=CODE` : code déjà rempli.
+- Sur le site, les téléphones passent par des courtiers MQTT publics (`src/mqtt-room.js`) : connexion simultanée à HiveMQ et EMQX, chaque message envoyé sur les deux, le premier arrivé gagne, doublons ignorés. Ne pas revenir à « un seul courtier au choix » : écran et téléphone pourraient se retrouver sur deux courtiers différents. Le QR code ouvre `site#j=CODE` : code déjà rempli.
 - Le canal est choisi automatiquement : capacité `room` si on est dans un artefact, MQTT sinon. Les deux mondes ne communiquent pas entre eux.
 
 ## Publication (artefact)
@@ -85,6 +85,12 @@ Un agent qui découvre un bug dans le fichier d'un autre le signale (message ou 
 - Node n'est pas installé sur la machine du projet. Pour lancer les tests, télécharger un binaire Node officiel dans un dossier temporaire (jamais d'installation système sans demander) et l'ajouter au `PATH` le temps de la session.
 - Test d'interface sans navigateur : `jsdom` installé dans un dossier temporaire, page `dist/index.html` chargée avec `runScripts: 'dangerously'`, clics simulés sur `[data-act]`, `[data-v]`, `[data-e]`, `[data-h]`.
 - L'extension Chrome peut être absente : ne pas compter dessus pour relire le rendu.
+
+## Rapidité ressentie
+- Le téléphone affiche tout de suite les actions sans secret (`ANTICIPATED` dans `src/ui.js` : poser, fin de tour, échange banque, défausse…). Ne jamais y mettre les dés, la pioche, le vol ni une confirmation d'échange : ils dépendent de cartes cachées.
+- L'hôte répond aux téléphones avant de redessiner son écran, et sert d'abord celui qui vient d'agir.
+- Après une erreur de règle, l'hôte renvoie la vue pour annuler l'affichage anticipé.
+- Zones de toucher : disques invisibles (`.hit`) bien plus larges que le point affiché + aimant sur l'emplacement valide le plus proche (`snapTap`). Sur téléphone le plateau est réduit à ~0,3 px par unité : toute cible de moins de ~130 unités est trop petite pour un doigt.
 
 ## Réseau (src/net.js)
 - Hôte autoritaire : seul l'écran du plateau détient l'état réel. Les téléphones envoient `{type, ...}` chiffré sur le sujet `a` ; l'hôte impose le siège (`player` n'est jamais cru) et répond sur `v`.

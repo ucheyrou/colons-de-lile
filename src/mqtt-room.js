@@ -10,10 +10,11 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
+  // Connexion simultanée aux deux : le plus rapide gagne, l'autre sert de secours.
+  // (test.mosquitto.org a été écarté : connexions et testaments trop irréguliers.)
   const BROKERS = [
-    'wss://broker.emqx.io:8084/mqtt',
     'wss://broker.hivemq.com:8884/mqtt',
-    'wss://test.mosquitto.org:8081',
+    'wss://broker.emqx.io:8084/mqtt',
   ];
   const PREFIX = 'colons-v1';
   const KEEPALIVE = 30;
@@ -111,6 +112,9 @@
   }
 
   // ---------- Salon ----------
+  // On se connecte à tous les courtiers en même temps et on envoie chaque message sur tous :
+  // le premier arrivé gagne (donc le plus rapide), les doublons sont ignorés, et si l'un tombe un autre prend le relais.
+  // Écran et téléphones se retrouvent même si un courtier a refusé l'un d'eux.
   async function join(code, opts) {
     const o = opts || {};
     const WS = o.WebSocket || (typeof WebSocket !== 'undefined' ? WebSocket : null);
@@ -121,17 +125,21 @@
     const peerId = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => (b % 36).toString(36)).join('');
     const willTopic = base + '/p/' + peerId;
 
-    let ws = null, up = false, closed = false, brokerIndex = 0, subId = 1, retry = 0;
-    let presence = {}, presenceTimer = 0, pingTimer = 0, beatTimer = 0, sweepTimer = 0;
+    let closed = false, subId = 1, seq = 0;
+    let presence = {}, presenceTimer = 0, beatTimer = 0, sweepTimer = 0;
     const topics = new Map();
     const peerHandlers = new Set();
     const connHandlers = new Set();
     const seen = new Map(); // id -> {presence, updatedAt, seenAt}
+    const heard = new Set(); // doublons d'événements (même message reçu par plusieurs courtiers)
     let pending = { joined: new Set(), updated: new Set(), left: new Set() };
     let flushing = false;
+    let selfUpdated = Date.now();
 
     const now = () => Date.now();
-    const send = (bytes) => { if (up && ws && ws.readyState === 1) ws.send(bytes); };
+    const links = brokers.map((url) => ({ url, ws: null, up: false, retry: 0, ping: 0, timer: 0 }));
+    const anyUp = () => links.some((l) => l.up);
+    const send = (bytes) => links.forEach((l) => { if (l.up && l.ws && l.ws.readyState === 1) l.ws.send(bytes); });
 
     const snapshot = () => {
       const t = now();
@@ -141,7 +149,6 @@
       });
       return list;
     };
-    let selfUpdated = now();
 
     function flush() {
       if (flushing) return;
@@ -167,7 +174,7 @@
       if (!obj || typeof obj.v !== 'object' || obj.v === null) return;
       const prev = seen.get(id);
       const changed = !prev || JSON.stringify(prev.presence) !== JSON.stringify(obj.v);
-      seen.set(id, { presence: Object.freeze(obj.v), updatedAt: changed ? now() : prev.updatedAt, seenAt: now() });
+      seen.set(id, { presence: changed ? Object.freeze(obj.v) : prev.presence, updatedAt: changed ? now() : prev.updatedAt, seenAt: now() });
       if (!prev) pending.joined.add(id);
       else if (changed) pending.updated.add(id);
       else return;
@@ -177,6 +184,12 @@
       let obj;
       try { obj = JSON.parse(dec.decode(payload)); } catch (e) { return; }
       if (!obj || typeof obj.p !== 'string') return;
+      if (obj.n !== undefined) {
+        const key = obj.p + ':' + obj.n;
+        if (heard.has(key)) return;
+        heard.add(key);
+        if (heard.size > 800) heard.delete(heard.values().next().value);
+      }
       const hs = topics.get(topic);
       if (!hs) return;
       const msg = { topic, data: obj.d, peer: obj.p, by: null, isMe: obj.p === peerId, sameTab: obj.p === peerId, kind: 'viewer', guest: false };
@@ -191,42 +204,42 @@
       else if (rel.startsWith('e/')) onEvent(rel.slice(2), m.payload);
     }
 
-    function publishPresence() {
-      send(publishPacket(willTopic, enc.encode(JSON.stringify({ t: now(), v: presence })), true));
-    }
+    const presenceBytes = () => publishPacket(willTopic, enc.encode(JSON.stringify({ t: now(), v: presence })), true);
+    const publishPresence = () => send(presenceBytes());
 
-    async function connect() {
-      let lastErr = null;
-      for (let k = 0; k < brokers.length; k++) {
-        const i = (brokerIndex + k) % brokers.length;
-        try {
-          const c = await openSocket(brokers[i], peerId, willTopic, WS);
-          brokerIndex = i;
-          ws = c.ws;
-          up = true;
-          retry = 0;
-          const reader = c.reader;
-          ws.onmessage = (ev) => reader.push(new Uint8Array(ev.data)).forEach(onPacket);
-          c.pending.forEach(onPacket);
-          ws.onclose = () => { up = false; connHandlers.forEach((h) => h(false)); if (!closed) reconnect(); };
-          ws.onerror = () => {};
-          send(subscribePacket(subId++, base + '/#'));
-          publishPresence();
-          clearInterval(pingTimer);
-          pingTimer = setInterval(() => send(PING), (KEEPALIVE * 1000) / 2);
-          connHandlers.forEach((h) => h(true));
-          return;
-        } catch (e) { lastErr = e; }
-      }
-      throw lastErr || new Error('aucun courtier joignable');
-    }
-    function reconnect() {
+    async function connectLink(l) {
       if (closed) return;
-      const wait = Math.min(10000, 800 * 2 ** retry++);
-      setTimeout(() => { if (!closed) connect().catch(reconnect); }, wait);
+      try {
+        const c = await openSocket(l.url, peerId, willTopic, WS);
+        if (closed) { try { c.ws.close(); } catch (e) { /* ignore */ } return; }
+        l.ws = c.ws; l.up = true; l.retry = 0;
+        const reader = c.reader;
+        l.ws.onmessage = (ev) => reader.push(new Uint8Array(ev.data)).forEach(onPacket);
+        c.pending.forEach(onPacket);
+        l.ws.onclose = () => { l.up = false; clearInterval(l.ping); connHandlers.forEach((h) => h(anyUp())); if (!closed) retryLink(l); };
+        l.ws.onerror = () => {};
+        l.ws.send(subscribePacket(subId++, base + '/#'));
+        l.ws.send(presenceBytes());
+        clearInterval(l.ping);
+        l.ping = setInterval(() => { if (l.up && l.ws.readyState === 1) l.ws.send(PING); }, (KEEPALIVE * 1000) / 2);
+        connHandlers.forEach((h) => h(true));
+      } catch (e) { if (!closed) retryLink(l); throw e; }
+    }
+    function retryLink(l) {
+      if (closed) return;
+      const wait = Math.min(15000, 1000 * 2 ** l.retry++);
+      l.timer = setTimeout(() => { connectLink(l).catch(() => {}); }, wait);
     }
 
-    await connect();
+    // On démarre tous les courtiers ; on attend le premier qui répond (ou l'échec de tous).
+    await new Promise((resolve, reject) => {
+      let failures = 0, ok = false;
+      links.forEach((l) => {
+        connectLink(l).then(() => { if (!ok) { ok = true; resolve(); } }, () => {
+          if (++failures === links.length && !ok) reject(new Error('aucun courtier joignable'));
+        });
+      });
+    }).catch((e) => { closed = true; links.forEach((l) => { clearTimeout(l.timer); try { l.ws && l.ws.close(); } catch (x) { /* ignore */ } }); throw e; });
 
     beatTimer = setInterval(() => publishPresence(), 15000);
     sweepTimer = setInterval(() => {
@@ -235,15 +248,20 @@
       if (pending.left.size) flush();
     }, 10000);
 
+    const shutdown = () => {
+      closed = true;
+      clearInterval(beatTimer); clearInterval(sweepTimer); clearTimeout(presenceTimer);
+      links.forEach((l) => { clearInterval(l.ping); clearTimeout(l.timer); });
+    };
     return {
       name: room,
       peerId,
-      broker: () => brokers[brokerIndex],
-      connected: () => up,
-      onConnection(h) { connHandlers.add(h); Promise.resolve().then(() => h(up)); return () => connHandlers.delete(h); },
+      brokers: () => links.filter((l) => l.up).map((l) => l.url),
+      connected: anyUp,
+      onConnection(h) { connHandlers.add(h); Promise.resolve().then(() => h(anyUp())); return () => connHandlers.delete(h); },
       async emit(topic, data) {
-        if (!up) return;
-        send(publishPacket(base + '/e/' + topic, enc.encode(JSON.stringify({ p: peerId, d: data })), false));
+        if (!anyUp()) return;
+        send(publishPacket(base + '/e/' + topic, enc.encode(JSON.stringify({ p: peerId, n: ++seq, d: data })), false));
       },
       on(topic, handler) {
         if (!topics.has(topic)) topics.set(topic, new Set());
@@ -266,13 +284,13 @@
       },
       async leave() {
         if (closed) return;
-        closed = true;
-        clearInterval(pingTimer); clearInterval(beatTimer); clearInterval(sweepTimer); clearTimeout(presenceTimer);
         send(publishPacket(willTopic, new Uint8Array(0), true));
-        try { send(Uint8Array.of(0xe0, 0)); ws.close(); } catch (e) { /* ignore */ }
+        send(Uint8Array.of(0xe0, 0));
+        shutdown();
+        links.forEach((l) => { try { l.ws && l.ws.close(); } catch (e) { /* ignore */ } });
       },
-      // Pour les tests : coupe la liaison sans prévenir, comme un onglet fermé.
-      _drop() { closed = true; clearInterval(pingTimer); clearInterval(beatTimer); clearInterval(sweepTimer); try { ws.close(); } catch (e) { /* ignore */ } },
+      // Pour les tests : coupe tout sans prévenir, comme un onglet fermé.
+      _drop() { shutdown(); links.forEach((l) => { try { l.ws && l.ws.close(); } catch (e) { /* ignore */ } }); },
     };
   }
 
