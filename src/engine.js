@@ -1,4 +1,4 @@
-// Moteur de règles de « Colons de l'Île ». Pur : pas de DOM, pas de Math.random, état = JSON.
+// Moteur de règles de « Au temps béni des colonies ». Pur : pas de DOM, pas de Math.random, état = JSON.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.Engine = factory();
@@ -8,7 +8,8 @@
   const RES = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
   const RES_FR = { wood: 'bois', brick: 'argile', sheep: 'laine', wheat: 'blé', ore: 'minerai' };
   const TERRAIN_RES = { forest: 'wood', hills: 'brick', pasture: 'sheep', fields: 'wheat', mountains: 'ore', desert: null };
-  const COLORS = ['red', 'blue', 'orange', 'white'];
+  const COLORS = ['red', 'blue', 'orange', 'white', 'green', 'purple'];
+  const COLOR_FR = { red: 'rouge', blue: 'bleu', orange: 'orange', white: 'blanc', green: 'vert', purple: 'violet' };
   const COST = {
     road: { wood: 1, brick: 1 },
     settlement: { wood: 1, brick: 1, sheep: 1, wheat: 1 },
@@ -204,7 +205,7 @@
     const s = { rng: seed, seed };
     s.board = buildBoard(s);
     s.players = names.map((name, id) => ({
-      id, name, color: COLORS[id],
+      id, name, color: null,
       hand: zero(), dev: [], knights: 0,
     }));
     s.bank = { wood: 19, brick: 19, sheep: 19, wheat: 19, ore: 19 };
@@ -215,10 +216,11 @@
     s.buildings = {};
     s.roads = {};
     s.robber = s.board.hexes.find((h) => h.terrain === 'desert').id;
-    s.order = { contenders: names.map((_, i) => i), pending: names.map((_, i) => i), rolls: names.map(() => []) };
+    const all = names.map((_, i) => i);
+    s.order = { groups: [all], pending: all.slice(), rolls: names.map(() => []) };
     s.setup = { idx: 0, order: [], last: null };
-    s.phase = 'order';
-    s.step = 'rollOrder';
+    s.phase = 'color';
+    s.step = 'pickColor';
     s.turn = 0;
     s.turnNo = 0;
     s.dice = null;
@@ -232,7 +234,7 @@
     s.largestArmy = { holder: null, size: 0 };
     s.winner = null;
     s.log = [];
-    log(s, 'La partie commence. Chacun lance un dé : le plus grand pose sa colonie en premier.');
+    log(s, 'La partie commence. Chacun choisit sa couleur.');
     return s;
   }
 
@@ -409,6 +411,7 @@
 
   function turnOnly(s, a) {
     need(s.phase !== 'ended', 'La partie est terminée.');
+    need(s.phase !== 'color', 'Choisis d\'abord ta couleur.');
     need(s.phase !== 'order', 'Lance d\'abord le dé pour savoir qui commence.');
     need(a.player === s.turn, 'Ce n\'est pas ton tour.');
   }
@@ -418,8 +421,24 @@
   }
   function clearTrade(s) { s.trade = null; }
 
-  // Tirage de l'ordre : un dé chacun, les ex aequo au plus haut relancent entre eux.
+  // Choix des couleurs : chacun la sienne, premier arrivé premier servi.
+  handlers.pickColor = (s, a) => {
+    need(s.phase === 'color', 'Les couleurs sont déjà choisies.');
+    need(!s.players[a.player].color, 'Tu as déjà choisi ta couleur.');
+    need(COLORS.includes(a.color), 'Couleur inconnue.');
+    need(!s.players.some((p) => p.color === a.color), 'Cette couleur est déjà prise.');
+    s.players[a.player].color = a.color;
+    log(s, nameOf(s, a.player) + ' joue en ' + COLOR_FR[a.color] + '.', a.player);
+    if (s.players.every((p) => p.color)) {
+      s.phase = 'order';
+      s.step = 'rollOrder';
+      log(s, 'Chacun lance un dé : du plus grand au plus petit, chacun choisit où poser sa colonie.');
+    }
+  };
+
+  // Tirage de l'ordre : un dé chacun ; les ex aequo relancent entre eux jusqu'à être départagés.
   handlers.rollOrder = (s, a) => {
+    need(s.phase !== 'color', 'Choisis d\'abord ta couleur.');
     need(s.phase === 'order', 'L\'ordre de jeu est déjà décidé.');
     need(s.order.pending.includes(a.player), 'Tu as déjà lancé ton dé.');
     const d = rint(s, 6) + 1;
@@ -429,25 +448,28 @@
     if (!s.order.pending.length) settleOrder(s);
   };
 
+  // order.groups : joueurs rangés du plus grand dé au plus petit ; un groupe de plusieurs = égalité à départager.
   function settleOrder(s) {
     const o = s.order;
     const last = (p) => o.rolls[p][o.rolls[p].length - 1];
-    const best = Math.max(...o.contenders.map(last));
-    const top = o.contenders.filter((p) => last(p) === best);
-    if (top.length > 1) {
-      o.contenders = top;
-      o.pending = top.slice();
-      log(s, 'Égalité à ' + best + ' : ' + top.map((p) => nameOf(s, p)).join(' et ') + ' relancent.');
+    o.groups = o.groups.flatMap((g) => {
+      if (g.length === 1) return [g];
+      const values = [...new Set(g.map(last))].sort((x, y) => y - x);
+      return values.map((d) => g.filter((p) => last(p) === d));
+    });
+    const ties = o.groups.filter((g) => g.length > 1);
+    if (ties.length) {
+      o.pending = ties.flat();
+      ties.forEach((g) => log(s, 'Égalité à ' + last(g[0]) + ' : ' + g.map((p) => nameOf(s, p)).join(' et ') + ' relancent.'));
       return;
     }
-    // Le premier pose, puis on tourne dans l'ordre des sièges, puis retour en sens inverse.
-    const n = s.players.length;
-    const ring = Array.from({ length: n }, (_, i) => (top[0] + i) % n);
-    s.setup.order = ring.concat(ring.slice().reverse());
+    const ranked = o.groups.flat();
+    s.setup.order = ranked.concat(ranked.slice().reverse());
     s.phase = 'setup';
     s.step = 'settlement';
-    s.turn = top[0];
-    log(s, nameOf(s, top[0]) + ' a le plus grand dé (' + best + ') et pose sa colonie en premier.', top[0]);
+    s.turn = ranked[0];
+    log(s, 'Ordre de pose : ' + ranked.map((p) => nameOf(s, p) + ' (' + o.rolls[p].join(' puis ') + ')').join(', ') + '.');
+    log(s, nameOf(s, ranked[0]) + ' choisit sa place en premier.', ranked[0]);
   }
 
   handlers.placeSettlement = (s, a) => {
@@ -769,6 +791,7 @@
     const afford = (c) => has(p.hand, c);
     const out = {
       myTurn: mine,
+      pickColor: s.phase === 'color' && !p.color ? COLORS.filter((c) => !s.players.some((q) => q.color === c)) : null,
       rollOrder: s.phase === 'order' && s.order.pending.includes(pid),
       roll: mine && main && s.step === 'roll',
       endTurn: acts,
@@ -812,6 +835,7 @@
   // Qui doit agir maintenant (utile à l'interface et au réseau).
   function actors(s) {
     if (s.phase === 'ended') return [];
+    if (s.phase === 'color') return s.players.filter((p) => !p.color).map((p) => p.id);
     if (s.phase === 'order') return s.order.pending.slice();
     if (s.phase === 'main' && s.step === 'discard') return Object.keys(s.discard).map(Number);
     return [s.turn];
@@ -844,7 +868,7 @@
   }
 
   return {
-    RES, RES_FR, DEV_FR, TERRAIN_RES, COST, LIMITS, WIN_POINTS,
+    RES, RES_FR, DEV_FR, TERRAIN_RES, COLORS, COLOR_FR, COST, LIMITS, WIN_POINTS,
     newGame, boardFromSeed, apply, available, targetsFor, actors, viewFor,
     points, total, longestRoadOf, tradeRatios,
     legalSettlements, legalCities, legalRoads,

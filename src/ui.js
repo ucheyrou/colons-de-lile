@@ -7,8 +7,6 @@
   const RES = E.RES;
   const ARTIFACT_URL = 'https://claude.ai/artifact/5joQ3H2dnKkyBn6zjJ5NMj';
   const NAME = { wood: 'Bois', brick: 'Argile', sheep: 'Laine', wheat: 'Blé', ore: 'Minerai' };
-  const COLOR_VAR = ['--p-red', '--p-blue', '--p-orange', '--p-white'];
-  const COLOR_FR = ['rouge', 'bleu', 'orange', 'blanc'];
   const GLYPH = { forest: 'wood', hills: 'brick', pasture: 'sheep', fields: 'wheat', mountains: 'ore', desert: 'desert' };
   const DEV_HELP = {
     knight: 'Déplace le voleur et vole une carte.',
@@ -30,7 +28,9 @@
   const icon = (r, cls) => '<svg class="' + (cls || 'ico') + '" aria-hidden="true"><use href="#g-' + r + '"/></svg>';
   const bundle = (b) => '<span class="bundle">' + RES.filter((r) => b[r]).map((r) => b[r] + icon(r, 'mini')).join(' ') + '</span>';
   const costIcons = (c) => RES.filter((r) => c[r]).map((r) => icon(r, 'mini').repeat(c[r])).join('');
-  const pcolor = (i) => 'var(' + COLOR_VAR[i] + ')';
+  const colorVar = (c) => 'var(--p-' + (c || 'none') + ')';
+  const pcolor = (i) => colorVar(game && game.players[i] && game.players[i].color);
+  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
   const cardsOf = (p) => (p.hand ? E.total(p.hand) : p.handCount);
   const devOf = (p) => (p.dev ? p.dev.length : p.devCount);
   const deckOf = (s) => (s.devDeck ? s.devDeck.length : s.devDeckCount);
@@ -42,7 +42,7 @@
   const ui = {
     screen: 'menu', pin: null, mode: null, tradeOpen: false, tab: 'bank', bankGive: null, bankGet: null,
     give: zero(), want: zero(), discard: zero(), pick: null, yop: [], toast: '', confirmNew: false,
-    count: 3, names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: '', orderSeen: null, pieces: null, news: [], newsNow: [], newsTimer: 0, lastTurn: -1, fxKey: null, fx: null, fxNow: null, fxTimer: 0, gain: null, gainTimer: 0, lastHand: null,
+    count: 3, names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: null, diceAt: 0, orderSeen: null, stageTimer: 0, pieces: null, news: [], newsNow: [], newsTimer: 0, lastTurn: -1, fxKey: null, fx: null, fxNow: null, fxTimer: 0, gain: null, gainTimer: 0, lastHand: null,
     code: '', joinCode: '', myName: '', error: '', busy: false,
     seat: -1, boardSeed: null, board: null, conn: 'searching', lobby: [], pending: 0, phoneTab: 'hand', needBoard: false, wasNeed: false, wasMine: false,
   };
@@ -90,7 +90,7 @@
   }
   // Actions que le téléphone peut montrer tout de suite : elles ne dépendent d'aucun secret (dés, pioche, main des autres).
   // L'hôte tranche ; sa vue remplace de toute façon l'affichage anticipé.
-  const ANTICIPATED = new Set(['placeSettlement', 'placeRoad', 'placeCity', 'endTurn', 'bankTrade', 'discard', 'offerTrade', 'cancelTrade', 'respondTrade']);
+  const ANTICIPATED = new Set(['pickColor', 'placeSettlement', 'placeRoad', 'placeCity', 'endTurn', 'bankTrade', 'discard', 'offerTrade', 'cancelTrade', 'respondTrade']);
   function anticipate(action) {
     if (!ANTICIPATED.has(action.type)) return;
     try {
@@ -230,7 +230,7 @@
     return out.join('');
   }
 
-  function resetFx() { ui.fxKey = null; ui.fx = null; ui.fxNow = null; ui.gain = null; ui.lastHand = null; ui.orderSeen = null; ui.pieces = null; ui.news = []; }
+  function resetFx() { ui.fxKey = null; ui.fx = null; ui.fxNow = null; ui.gain = null; ui.lastHand = null; ui.orderSeen = null; ui.diceKey = null; ui.pieces = null; ui.news = []; }
 
   // ---------- Annonce des constructions, façon écran de bowling : on compare les pièces au rendu précédent ----------
   const NEWS_MS = 3200;
@@ -342,18 +342,18 @@
     if (mode === 'client') {
       txt = hintText(s, ui.seat, E.available(s, ui.seat)).t;
     } else if (s.phase === 'ended') txt = who.name + ' a gagné';
+    else if (s.phase === 'color') txt = 'Chacun choisit sa couleur';
     else if (s.phase === 'order') txt = 'Qui commence ? Chacun lance un dé';
     else if (s.phase === 'setup') txt = who.name + ' · ' + (s.step === 'settlement' ? 'pose une colonie' : 'pose une route');
     else {
       const map = { roll: 'lance les dés', discard: 'attend les défausses', robber: 'déplace le voleur', steal: 'choisit qui voler', actions: 'joue son tour', roadBuilding: 'pose ses routes' };
       txt = who.name + ' · ' + (map[s.step] || '');
     }
-    let dice = s.phase === 'order' ? orderDiceHTML(s) : '';
+    let dice = '';
     if (s.dice) {
-      const key = s.turnNo + ':' + s.dice.join(',');
-      const fresh = key !== ui.diceKey;
-      ui.diceKey = key;
-      dice = '<div class="dice' + (fresh ? ' rolled' : '') + '" aria-label="Dés"><span class="die">' + s.dice[0] + '</span><span class="die">' + s.dice[1] + '</span><span class="sum">' + (s.dice[0] + s.dice[1]) + '</span></div>';
+      const el = Date.now() - ui.diceAt;
+      dice = '<div class="dice" style="--el:-' + el + 'ms" aria-label="Dés : ' + s.dice[0] + ' et ' + s.dice[1] + '">' + cubeHTML(s.dice[0], el) + cubeHTML(s.dice[1], el, 1) +
+        '<span class="sum">' + (s.dice[0] + s.dice[1]) + '</span></div>';
     }
     let cap = '';
     if (ui.fxNow && ui.fxNow.sum !== 7) {
@@ -361,23 +361,70 @@
         ? 'Produisent : ' + ui.fxNow.terrains.map((tr) => icon(GLYPH[tr], 'mini')).join('')
         : 'Aucune tuile ne produit') + (ui.fxNow.blocked.length ? ' <b>· bloquée par le voleur</b>' : '') + '</div>';
     }
-    const dot = s.phase === 'order' ? '' : '<span class="dot" style="--pc:' + pcolor(s.turn) + '"></span>';
+    const dot = s.phase === 'order' || s.phase === 'color' ? '' : '<span class="dot" style="--pc:' + pcolor(s.turn) + '"></span>';
     const cancel = mode === 'client' && ui.mode ? '<button class="btn small" data-act="mode" data-k="' + ui.mode + '">Annuler</button>' : '';
     return '<div class="say">' + dot + esc(txt) + '</div>' + cancel + dice + cap;
   }
 
-  // Dés du tirage de départ ; seul le dé qui vient d'être lancé roule, les joueurs départagés s'estompent.
-  function orderDiceHTML(s) {
-    const prev = ui.orderSeen || [];
-    const counts = s.order.rolls.map((r) => r.length);
-    ui.orderSeen = counts;
-    const dice = s.players.filter((p) => counts[p.id]).map((p) => {
-      const cls = 'die' + (counts[p.id] !== prev[p.id] ? ' tumble' : '') + (s.order.contenders.includes(p.id) ? '' : ' out');
-      return '<span class="' + cls + '" style="--pc:' + pcolor(p.id) + '" title="' + esc(p.name) + '">' + lastRoll(s, p.id) + '</span>';
-    });
-    return dice.length ? '<div class="dice order" aria-label="Dés de départ">' + dice.join('') + '</div>' : '';
+  // ---------- Dés en 3D ----------
+  // Un cube à six faces ; il roule pendant ROLL_MS puis se pose sur la face tirée. --el recale l'animation à chaque rendu.
+  const ROLL_MS = 1300;
+  const PIPS = { 1: ['c'], 2: ['tl', 'br'], 3: ['tl', 'c', 'br'], 4: ['tl', 'tr', 'bl', 'br'], 5: ['tl', 'tr', 'c', 'bl', 'br'], 6: ['tl', 'tr', 'ml', 'mr', 'bl', 'br'] };
+  const FACES = [1, 2, 3, 4, 5, 6].map((f) => '<span class="face f' + f + '">' + PIPS[f].map((p) => '<i class="' + p + '"></i>').join('') + '</span>').join('');
+  function cubeHTML(v, el, alt) {
+    const rolling = el < ROLL_MS;
+    return '<span class="cube-box' + (rolling ? ' rolling' : '') + (alt ? ' alt' : '') + '"' + (rolling ? ' style="--el:-' + el + 'ms"' : '') + ' aria-hidden="true">' +
+      '<span class="cube-shadow"></span><span class="cube" data-v="' + v + '">' + FACES + '</span></span>';
   }
-  const lastRoll = (s, i) => s.order.rolls[i][s.order.rolls[i].length - 1];
+  function trackDice() {
+    const s = game, key = s.dice ? s.turnNo + ':' + s.dice.join(',') : '';
+    if (ui.diceKey !== null && key && key !== ui.diceKey) ui.diceAt = Date.now();
+    ui.diceKey = key;
+  }
+
+  // Dates des lancers de départ, comparées au rendu précédent ; une partie reprise en cours n'anime rien.
+  function trackOrder() {
+    const counts = game.order.rolls.map((r) => r.length);
+    const prev = ui.orderSeen, t = Date.now();
+    const at = counts.map((n, i) => (!prev ? 0 : n !== prev.counts[i] ? t : prev.at[i]));
+    ui.orderSeen = { counts, at };
+    if (prev && at.some((x, i) => x !== prev.at[i])) {
+      clearTimeout(ui.stageTimer);
+      ui.stageTimer = setTimeout(render, ROLL_MS + STAGE_LINGER + 80);
+    }
+  }
+  // Après le dernier dé, le classement reste affiché un instant avant de laisser place au plateau.
+  const STAGE_LINGER = 2600;
+  function stageShown(s) {
+    if (s.phase === 'color' || s.phase === 'order') return true;
+    if (s.phase !== 'setup' || Object.keys(s.buildings).length || !ui.orderSeen) return false;
+    return Date.now() - Math.max(...ui.orderSeen.at) < ROLL_MS + STAGE_LINGER;
+  }
+  const RANK = (n) => (n === 1 ? '1er' : n + 'e');
+  function stageHTML(s, compact) {
+    const head = '<div class="stage-in' + (compact ? ' compact' : '') + '"';
+    if (s.phase === 'color') {
+      return head + '><h2>Choix des couleurs</h2><ul class="stage-colors">' + s.players.map((p) =>
+        '<li style="--pc:' + colorVar(p.color) + '"><span class="dot"></span><b>' + esc(p.name) + '</b><span>' + (p.color ? cap(E.COLOR_FR[p.color]) : 'choisit…') + '</span></li>').join('') + '</ul></div>';
+    }
+    const o = s.order, seen = ui.orderSeen || { at: o.rolls.map(() => 0) };
+    const t = Date.now(), lastAt = Math.max(...seen.at);
+    const rank = {};
+    let n = 0;
+    o.groups.forEach((g) => { if (g.length === 1) rank[g[0]] = n + 1; n += g.length; });
+    const cols = s.players.map((p, i) => {
+      const r = o.rolls[i];
+      const die = r.length ? cubeHTML(r[r.length - 1], t - seen.at[i]) : '<span class="cube-empty">?</span>';
+      const status = rank[i] ? RANK(rank[i]) : o.pending.includes(i) ? (r.length ? 'Relance !' : 'À lancer') : '';
+      return '<li style="--pc:' + pcolor(i) + '">' + die + '<span class="who"><span class="dot"></span>' + esc(p.name) + '</span>' +
+        (status ? '<span class="rank' + (rank[i] === 1 ? ' first' : '') + '">' + status + '</span>' : '') + (r.length > 1 ? '<small>' + rollsText(s, i) + '</small>' : '') + '</li>';
+    }).join('');
+    return head + ' style="--sl:-' + (t - lastAt) + 'ms"><h2>Qui commence ?</h2>' +
+      '<p>Du plus grand dé au plus petit, chacun choisit où poser sa première colonie.</p><ul class="stage-dice">' + cols + '</ul></div>';
+  }
+  function renderStage() {
+    $('stage').innerHTML = mode !== 'client' && stageShown(game) ? stageHTML(game) : '';
+  }
   const rollsText = (s, i) => s.order.rolls[i].join(' puis ');
 
   // ---------- Scores ----------
@@ -407,8 +454,12 @@
   function hintText(s, v, av) {
     const turnName = s.players[s.turn].name;
     if (s.phase === 'ended') return { t: s.players[s.winner].name + ' remporte la partie.', go: false };
+    if (s.phase === 'color') {
+      if (av.pickColor) return { t: 'Choisis ta couleur.', go: true };
+      return { t: 'Tu joues en ' + E.COLOR_FR[s.players[v].color] + '. En attente de ' + s.players.filter((p) => !p.color).map((p) => p.name).join(', ') + '.', go: false };
+    }
     if (s.phase === 'order') {
-      if (av.rollOrder) return { t: s.order.rolls[v].length ? 'Égalité : relance ton dé.' : 'Lance le dé : le plus grand pose sa colonie en premier.', go: true };
+      if (av.rollOrder) return { t: s.order.rolls[v].length ? 'Égalité : relance ton dé.' : 'Lance le dé : le plus grand choisit sa place en premier.', go: true };
       return { t: 'En attente du dé de ' + s.order.pending.map((i) => s.players[i].name).join(', ') + '.', go: false };
     }
     if (s.phase === 'setup') {
@@ -484,7 +535,7 @@
   function needsMe(s, v) {
     if (!s || s.phase === 'ended' || v < 0) return false;
     const av = E.available(s, v);
-    return !!(av.rollOrder || av.roll || av.discard || av.setupSettlement || av.setupRoad || av.moveRobber || av.steal || av.freeRoad ||
+    return !!(av.pickColor || av.rollOrder || av.roll || av.discard || av.setupSettlement || av.setupRoad || av.moveRobber || av.steal || av.freeRoad ||
       (s.trade && s.trade.from !== v && s.trade.responses[v] === undefined && s.phase === 'main'));
   }
 
@@ -512,7 +563,7 @@
     const av = E.available(s, v);
     const hint = hintText(s, v, av);
     const chips = mode === 'local' ? '<div class="chips" role="group" aria-label="Changer de joueur affiché">' + s.players.map((p, i) => {
-      const alert = (s.phase === 'order' && s.order.pending.includes(i)) || (s.step === 'discard' && s.discard[i]) || (s.trade && s.trade.from !== i && s.trade.responses[i] === undefined && s.phase === 'main');
+      const alert = (s.phase === 'color' && !p.color) || (s.phase === 'order' && s.order.pending.includes(i)) || (s.step === 'discard' && s.discard[i]) || (s.trade && s.trade.from !== i && s.trade.responses[i] === undefined && s.phase === 'main');
       return '<button class="chip" data-act="view" data-i="' + i + '" aria-pressed="' + (i === v) + '"><span class="dot" style="--pc:' + pcolor(i) + '"></span>' + esc(p.name) + (alert ? '<span class="alert" title="Doit agir"></span>' : '') + '</button>';
     }).join('') + '</div>' : '';
     let html = '<div class="hand-head"><span class="dot" style="--pc:' + pcolor(v) + '"></span><h2>' + (mode === 'client' ? esc(me.name) : 'Main de ' + esc(me.name)) + '</h2>' +
@@ -529,8 +580,9 @@
       return '<div class="tile' + (me.hand[r] ? '' : ' zero') + (gained ? ' gain' : '') + '"' + (gained ? ' style="--gd:-' + gElapsed + 'ms"' : '') + '>' + (gained ? '<i class="plus">+' + gained + '</i>' : '') + icon(r) + '<b>' + me.hand[r] + '</b><span>' + NAME[r] + '</span></div>';
     }).join('') + '</div>';
 
+    if (av.pickColor) html += colorPickHTML(s);
     if (av.rollOrder) html += '<button class="btn primary big" data-act="roll-order">Lancer le dé</button>';
-    if (s.phase === 'order') html += orderListHTML(s);
+    if (mode === 'client' && stageShown(s)) html += stageHTML(s, true);
     if (av.roll) html += '<button class="btn primary big" data-act="roll">Lancer les dés</button>';
     if (av.discard) {
       const n = sum(ui.discard);
@@ -586,12 +638,12 @@
     return html;
   }
 
-  function orderListHTML(s) {
-    return '<div class="section-title">Qui commence ?</div><ul class="players">' + s.players.map((p, i) => {
-      const n = s.order.rolls[i].length;
-      return '<li class="pl" style="--pc:' + pcolor(i) + '"><span class="dot"></span><b>' + esc(p.name) + '</b><span class="pts">' + (n ? lastRoll(s, i) : '…') + '</span>' +
-        (n > 1 ? '<span class="meta">' + rollsText(s, i) + '</span>' : '') + '</li>';
-    }).join('') + '</ul>';
+  function colorPickHTML(s) {
+    return '<div class="section-title">Choisis ta couleur</div><div class="swatches">' + E.COLORS.map((c) => {
+      const owner = s.players.find((p) => p.color === c);
+      return '<button class="swatch" data-act="pick-color" data-c="' + c + '" style="--pc:' + colorVar(c) + '"' + (owner ? ' disabled' : '') + '>' +
+        '<span class="sw"></span><span>' + cap(E.COLOR_FR[c]) + '</span>' + (owner ? '<small>' + esc(owner.name) + '</small>' : '') + '</button>';
+    }).join('') + '</div>';
   }
 
   function logHTML() {
@@ -647,8 +699,9 @@
       '<div><div class="section-title">Nombre de joueurs</div><div class="seg" role="group">' +
       [2, 3, 4].map((n) => '<button class="btn" data-act="count" data-n="' + n + '" aria-pressed="' + (ui.count === n) + '">' + n + '</button>').join('') + '</div></div>' +
       '<div class="names">' + Array.from({ length: ui.count }, (_, i) =>
-        '<label class="name-row" style="--pc:' + pcolor(i) + '"><span class="dot"></span><span class="sr">Nom du joueur ' + (i + 1) + '</span>' +
-        '<input id="name' + i + '" type="text" maxlength="14" value="' + esc(ui.names[i]) + '" autocomplete="off"><small>' + COLOR_FR[i] + '</small></label>').join('') + '</div>' +
+        '<label class="name-row"><span class="sr">Nom du joueur ' + (i + 1) + '</span>' +
+        '<input id="name' + i + '" type="text" maxlength="14" value="' + esc(ui.names[i]) + '" autocomplete="off"></label>').join('') + '</div>' +
+      '<p class="note">Chacun choisit sa couleur au début de la partie.</p>' +
       '<button class="btn primary big" data-act="start">Lancer la partie</button>';
   }
 
@@ -661,7 +714,7 @@
       (qr ? '<div class="qr" role="img" aria-label="QR code pour rejoindre">' + qr + '</div>' : '') + '</div>' +
       '<ol class="steps"><li>Scanne le QR code avec l\'appareil photo du téléphone, ou ouvre <span class="mono">' + esc(shortUrl()) + '</span></li><li>Si le code n\'est pas déjà rempli, choisis « Rejoindre depuis mon téléphone » et entre <b>' + esc(ui.code) + '</b></li><li>Entre ton prénom et touche « Rejoindre »</li></ol>';
     html += '<div><div class="section-title">Joueurs connectés (' + players.length + '/4)</div><ul class="players">' + (players.length ? players.slice(0, 4).map((p, i) =>
-      '<li class="pl" style="--pc:' + pcolor(i) + '"><span class="dot"></span><b>' + esc(p.name) + '</b><span class="meta">' + COLOR_FR[i] + '</span></li>').join('') : '<li class="pl empty">En attente des téléphones…</li>') + '</ul>' +
+      '<li class="pl"><span class="dot"></span><b>' + esc(p.name) + '</b></li>').join('') : '<li class="pl empty">En attente des téléphones…</li>') + '</ul>' +
       (players.length > 4 ? '<p class="note">Seuls les 4 premiers arrivés joueront.</p>' : '') + '</div>';
     html += '<button class="btn primary big" data-act="host-start"' + (players.length >= 2 ? '' : ' disabled') + '>Lancer la partie</button>' +
       (inArtifact() ? '<p class="note">Les joueurs doivent avoir accès à l\'artefact (partage avec droit de contribution). Ne republie pas la page pendant une partie : cela déconnecte tout le monde.</p>' : '<p class="note">Aucun compte à créer. Les échanges entre appareils sont chiffrés : le serveur de salle ne voit passer que des messages illisibles.</p>');
@@ -677,7 +730,7 @@
       else if (w === 'lobby') msg = 'Tu es dans la salle. La partie va bientôt commencer.';
       else if (w === 'full') msg = 'Cette partie a déjà commencé et n\'a pas de place pour toi.';
       return '<h2>Salle ' + esc(ui.joinCode) + '</h2><p class="hint go" role="status">' + msg + '</p>' +
-        (ui.lobby.length ? '<div><div class="section-title">Dans la salle</div><ul class="players">' + ui.lobby.map((n, i) => '<li class="pl" style="--pc:' + pcolor(i % 4) + '"><span class="dot"></span><b>' + esc(n) + '</b></li>').join('') + '</ul></div>' : '') +
+        (ui.lobby.length ? '<div><div class="section-title">Dans la salle</div><ul class="players">' + ui.lobby.map((n) => '<li class="pl"><span class="dot"></span><b>' + esc(n) + '</b></li>').join('') + '</ul></div>' : '') +
         '<button class="btn" data-act="leave">Changer de salle</button>';
     }
     return '<button class="btn small back" data-act="goto" data-s="menu">← Retour</button><h2>Rejoindre une partie</h2>' +
@@ -736,6 +789,8 @@
     trackRoll();
     trackGain();
     trackBuilds();
+    trackDice();
+    trackOrder();
     ui.fxNow = activeFx();
     ui.newsNow = activeNews();
     $('board').innerHTML = boardHTML();
@@ -758,6 +813,7 @@
     $('scores').innerHTML = scoresHTML();
     renderLog();
     renderNews();
+    renderStage();
     const over = $('over');
     over.innerHTML = overHTML();
     over.hidden = game.phase !== 'ended';
@@ -777,7 +833,7 @@
     game = E.newGame({ names, seed: newSeed() });
     mode = 'local';
     resetFx();
-    ui.pin = null; ui.mode = null; ui.lastTurn = -1; ui.diceKey = ''; ui.tradeOpen = false; ui.confirmNew = false;
+    ui.pin = null; ui.mode = null; ui.lastTurn = -1; ui.tradeOpen = false; ui.confirmNew = false;
     save();
     render();
   }
@@ -939,6 +995,7 @@
     },
     'phone-tab': (t) => { ui.phoneTab = t.dataset.k; render(); },
     view: (t) => { ui.pin = +t.dataset.i; ui.mode = null; render(); },
+    'pick-color': (t) => dispatch({ type: 'pickColor', player: viewer(), color: t.dataset.c }),
     'roll-order': () => dispatch({ type: 'rollOrder', player: viewer() }),
     roll: () => dispatch({ type: 'roll', player: viewer() }),
     end: () => dispatch({ type: 'endTurn', player: viewer() }),

@@ -23,7 +23,9 @@ const check = (ok, msg) => { console.log(ok ? 'OK    ' : 'ÉCHEC ', msg); if (!o
 
 click(q('[data-act=goto][data-s=setup]'));
 click(q('[data-act=start]'));
-check(/Qui commence/.test(q('#banner').textContent), 'la partie s\'ouvre sur le tirage au dé');
+check(/couleur/.test(q('#banner').textContent) && qa('#hand [data-act=pick-color]').length === 6, 'la partie s\'ouvre sur le choix des couleurs');
+for (let i = 0; i < 10 && q('#hand [data-act=pick-color]:not(:disabled)'); i++) click(q('#hand [data-act=pick-color]:not(:disabled)'));
+check(/Qui commence/.test(q('#banner').textContent) && /Qui commence/.test(q('#stage').textContent), 'puis le tirage au dé');
 for (let i = 0; i < 30 && q('[data-act=roll-order]'); i++) click(q('[data-act=roll-order]'));
 check(!q('[data-act=roll-order]') && qa('#board [data-v]').length > 0, 'ordre décidé, le premier pose sa colonie');
 for (let i = 0; i < 40 && q('#board [data-v], #board [data-e]'); i++) click(q('#board [data-v], #board [data-e]'));

@@ -1,4 +1,4 @@
-# CLAUDE.md — Colons de l'Île
+# CLAUDE.md — Au temps béni des colonies
 
 Jeu de plateau en ligne (inspiré des règles de base de Catan). Plateau sur ordinateur, main privée de chaque joueur sur téléphone. Lis `PLAN.md` avant toute modification structurante et `RULES.md` avant de toucher aux règles.
 
@@ -7,7 +7,7 @@ Jeu de plateau en ligne (inspiré des règles de base de Catan). Plateau sur ord
 - Identifiants de code : anglais (`placeRoad`, `wood`, `brick`…).
 
 ## Propriété intellectuelle
-- Ne jamais écrire « Catan » dans l'interface, le `<title>` ou les visuels. Nom du jeu : **Colons de l'Île**.
+- Ne jamais écrire « Catan » dans l'interface, le `<title>` ou les visuels. Nom du jeu : **Au temps béni des colonies**.
 - Tous les visuels sont dessinés ici (SVG inline). Ne pas copier d'illustrations, de polices ou de textes d'un jeu du commerce.
 
 ## Architecture (ne pas casser)
@@ -52,7 +52,7 @@ Ne publie l'artefact qu'après `node --test` et `node build.mjs` verts.
 ## Publication (artefact)
 - Publier `dist/index.html` avec l'outil Artifact, même chemin à chaque fois pour garder le même lien, avec `capabilities: {room: {topics: {a: "interact"}}}`.
 - Le lien de l'artefact est écrit en dur dans `src/ui.js` (`ARTIFACT_URL`, pour le QR) : à mettre à jour si l'artefact change d'adresse.
-- Le fichier publié ne contient ni `<html>`, ni `<head>`, ni `<body>` (le squelette est ajouté à la publication). `<title>` en tête : « Colons de l'Île ».
+- Le fichier publié ne contient ni `<html>`, ni `<head>`, ni `<body>` (le squelette est ajouté à la publication). `<title>` en tête : « Au temps béni des colonies ».
 - Bibliothèques externes : à éviter. Si indispensable, cdnjs, version exacte vieille d'au moins 2 semaines.
 - `alert/confirm/prompt` sont inertes : toute confirmation est une interface dans la page.
 - Thème : jetons de couleur sur `:root`, redéfinis pour `prefers-color-scheme: dark` (avec `:root:not([data-theme="light"])`) et `:root[data-theme="dark"]`. Les couleurs de terrain et de joueurs sont sémantiques et restent fixes.
@@ -92,6 +92,11 @@ Un agent qui découvre un bug dans le fichier d'un autre le signale (message ou 
 - L'hôte répond aux téléphones avant de redessiner son écran, et sert d'abord celui qui vient d'agir.
 - Après une erreur de règle, l'hôte renvoie la vue pour annuler l'affichage anticipé.
 - Zones de toucher : disques invisibles (`.hit`) bien plus larges que le point affiché + aimant sur l'emplacement valide le plus proche (`snapTap`). Sur téléphone le plateau est réduit à ~0,3 px par unité : toute cible de moins de ~130 unités est trop petite pour un doigt.
+
+## Début de partie (src/ui.js)
+- Couleurs choisies en jeu (phase `color`), pas sur l'écran d'accueil : `pcolor(i)` lit `game.players[i].color`, gris (`--p-none`) tant qu'elle n'est pas choisie.
+- Choix des couleurs et tirage au dé s'affichent au centre du plateau (`#stage`, `.roll-stage`) ; sur téléphone, dans la main (`stageHTML(s, true)`). Le classement reste ~2,6 s après le dernier dé (`STAGE_LINGER`).
+- Dés en 3D (`cubeHTML`, `.cube-box`) : cube CSS orienté par `data-v`, lancer de `ROLL_MS` recalé par `--el` (`trackDice`, `trackOrder`).
 
 ## Animation du lancer (src/ui.js, src/style.css)
 - À chaque nouveau lancer (`trackRoll`) : les tuiles qui produisent sont redessinées au premier plan (`.fx-hex`), le reste s'estompe (`#board.fx-on`), des « +n » montent au-dessus des colonies (`.fx-gain`), la tuile bloquée par le voleur est cerclée de rouge (`.fx-block`). Durée `FX_MS` = 4,2 s.

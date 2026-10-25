@@ -16,8 +16,17 @@ const refused = (s, a) => {
   return r.error;
 };
 
-// Fait lancer le dé de départ à chacun jusqu'à ce que l'ordre soit décidé.
+// Donne une couleur à chacun.
+function pickColors(s) {
+  while (s.phase === 'color') {
+    const p = E.actors(s)[0];
+    s = ok(s, { type: 'pickColor', player: p, color: E.available(s, p).pickColor[0] });
+  }
+  return s;
+}
+// Choisit les couleurs puis fait lancer le dé de départ à chacun jusqu'à ce que l'ordre soit décidé.
 function decideOrder(s) {
+  s = pickColors(s);
   while (s.phase === 'order') s = ok(s, { type: 'rollOrder', player: E.actors(s)[0] });
   return s;
 }
@@ -99,13 +108,35 @@ test('déterminisme : même graine, même plateau et mêmes dés', () => {
 test('apply ne modifie pas son entrée', () => {
   const s = fresh();
   const before = JSON.stringify({ ...s, board: null });
-  E.apply(s, { type: 'rollOrder', player: 0 });
+  E.apply(s, { type: 'pickColor', player: 0, color: 'red' });
+  E.apply(pickColors(s), { type: 'rollOrder', player: 0 });
   E.apply(decideOrder(s), { type: 'placeSettlement', player: decideOrder(s).turn, vertex: 0 });
   assert.equal(JSON.stringify({ ...s, board: null }), before);
 });
 
-test('tirage de départ : un dé chacun, une seule fois, rien d\'autre avant', () => {
+test('couleurs : chacun la sienne, une seule fois, avant tout le reste', () => {
   let s = fresh();
+  assert.equal(s.phase, 'color');
+  assert.deepEqual(E.actors(s), [0, 1, 2]);
+  assert.deepEqual(E.available(s, 0).pickColor, E.COLORS);
+  refused(s, { type: 'rollOrder', player: 0 });
+  refused(s, { type: 'placeSettlement', player: 0, vertex: 0 });
+  assert.match(refused(s, { type: 'pickColor', player: 0, color: 'pink' }), /inconnue/);
+  s = ok(s, { type: 'pickColor', player: 1, color: 'white' });
+  assert.equal(s.players[1].color, 'white');
+  assert.match(refused(s, { type: 'pickColor', player: 0, color: 'white' }), /prise/);
+  assert.match(refused(s, { type: 'pickColor', player: 1, color: 'red' }), /déjà/);
+  assert.equal(E.available(s, 1).pickColor, null);
+  assert.ok(!E.available(s, 0).pickColor.includes('white'));
+  assert.deepEqual(E.actors(s), [0, 2]);
+  s = ok(s, { type: 'pickColor', player: 0, color: 'green' });
+  s = ok(s, { type: 'pickColor', player: 2, color: 'purple' });
+  assert.equal(s.phase, 'order');
+  assert.equal(new Set(s.players.map((p) => p.color)).size, 3);
+});
+
+test('tirage de départ : un dé chacun, une seule fois, rien d\'autre avant', () => {
+  let s = pickColors(fresh());
   assert.equal(s.phase, 'order');
   assert.deepEqual(E.actors(s), [0, 1, 2]);
   assert.ok([0, 1, 2].every((p) => E.available(s, p).rollOrder));
@@ -118,34 +149,37 @@ test('tirage de départ : un dé chacun, une seule fois, rien d\'autre avant', (
   assert.equal(E.available(s, 1).rollOrder, false);
 });
 
-test('tirage de départ : le plus grand dé pose en premier, les ex aequo relancent', () => {
+test('tirage de départ : on pose du plus grand dé au plus petit, les ex aequo relancent entre eux', () => {
   let ties = 0;
-  for (let seed = 1; seed <= 80; seed++) {
-    const s = decideOrder(fresh(seed));
-    const first = s.turn;
+  for (let seed = 1; seed <= 120; seed++) {
+    const n = seed % 2 ? names : names.concat('David');
+    const s = decideOrder(fresh(seed, n));
     const rolls = s.order.rolls;
-    const rounds = Math.max(...rolls.map((r) => r.length));
-    assert.equal(rolls[first].length, rounds, 'le gagnant a joué chaque manche, seed ' + seed);
-    for (let k = 0; k < rounds; k++) {
-      const inRound = rolls.map((r, p) => (r.length > k ? p : -1)).filter((p) => p >= 0);
-      const best = Math.max(...inRound.map((p) => rolls[p][k]));
-      assert.equal(rolls[first][k], best, 'le gagnant a le plus grand dé, seed ' + seed);
-      const top = inRound.filter((p) => rolls[p][k] === best);
-      const next = rolls.map((r, p) => (r.length > k + 1 ? p : -1)).filter((p) => p >= 0);
-      if (k < rounds - 1) assert.deepEqual(next, top, 'seuls les ex aequo relancent, seed ' + seed);
-      else assert.equal(top.length, 1);
+    const ranked = s.setup.order.slice(0, n.length);
+    assert.deepEqual(s.setup.order, ranked.concat(ranked.slice().reverse()), 'serpentin, seed ' + seed);
+    assert.deepEqual(ranked.slice().sort(), n.map((_, i) => i));
+    assert.equal(s.turn, ranked[0]);
+    // Deux voisins du classement : le premier dé qui diffère est le plus grand chez le mieux classé.
+    for (let k = 1; k < ranked.length; k++) {
+      const a = rolls[ranked[k - 1]], b = rolls[ranked[k]];
+      const i = a.findIndex((d, j) => d !== b[j]);
+      assert.ok(i >= 0 && a[i] > b[i], 'classement, seed ' + seed + ' : ' + JSON.stringify(rolls));
     }
-    if (rounds > 1) ties++;
-    assert.deepEqual(s.setup.order, [0, 1, 2, 2, 1, 0].map((i) => (i + first) % 3));
+    // On ne relance que si quelqu'un avait exactement les mêmes dés jusque-là.
+    rolls.forEach((r, p) => {
+      const before = r.slice(0, -1).join();
+      if (r.length > 1) assert.ok(rolls.some((q, j) => j !== p && q.slice(0, r.length - 1).join() === before), 'relance sans égalité, seed ' + seed);
+    });
+    if (rolls.some((r) => r.length > 1)) ties++;
     assert.equal(s.phase, 'setup');
-    assert.ok(E.available(s, first).setupSettlement);
+    assert.ok(E.available(s, ranked[0]).setupSettlement);
   }
-  assert.ok(ties > 0, 'au moins une égalité sur 80 graines');
+  assert.ok(ties > 10, 'des égalités sur 120 graines');
 });
 
 test('mise en place : serpentin, distance, 2e colonie rapporte', () => {
   let s = decideOrder(fresh());
-  const first = s.turn, next = (first + 1) % 3;
+  const first = s.turn, next = s.setup.order[1];
   refused(s, { type: 'placeSettlement', player: next, vertex: 0 });
   s = ok(s, { type: 'placeSettlement', player: first, vertex: 0 });
   refused(s, { type: 'placeSettlement', player: first, vertex: s.board.vertices[0].nbrs[0] });

@@ -75,7 +75,7 @@ while (steps < Number(process.argv.find((a) => /^\d+$/.test(a)) || 2500) && !end
   const p = phones[Math.floor(Math.random() * phones.length)];
   const targets = p.qa('#board [data-v], #board [data-e], #board [data-h]');
   const btns = p.qa('#hand button[data-act]:not(:disabled)').filter((b) => !['tab', 'trade-toggle', 'pick-cancel'].includes(b.dataset.act));
-  const prio = btns.find((b) => ['roll-order', 'roll', 'discard', 'steal'].includes(b.dataset.act));
+  const prio = btns.find((b) => ['pick-color', 'roll-order', 'roll', 'discard', 'steal'].includes(b.dataset.act));
   const pool = [...targets, ...targets, ...btns];
   if (pool.length) {
     let el = prio || pool[Math.floor(Math.random() * pool.length)];

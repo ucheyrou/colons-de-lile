@@ -1,4 +1,4 @@
-# Colons de l'Île
+# Au temps béni des colonies
 
 Jeu de plateau de colonisation en ligne, inspiré des règles de base de Catan (nom et visuels originaux).
 Le plateau s'affiche sur un ordinateur ou une télé, chaque joueur voit sa main privée sur son téléphone.

@@ -124,10 +124,10 @@ test('un espion dans la salle ne peut lire aucune vue', async () => {
 test('une action de téléphone est validée par l\'hôte et republiée à tous', async () => {
   const ctx = await setup(3);
   await start(ctx);
-  await ctx.phones[0].client.send({ type: 'rollOrder', player: 2 });
-  await until(() => ctx.getGame().order.rolls[0].length);
-  assert.equal(ctx.getGame().order.rolls[2].length, 0, 'le siège est imposé par l\'hôte, pas par le téléphone');
-  await until(() => ctx.phones.every((p) => p.got.views.at(-1).view.order.rolls[0].length));
+  await ctx.phones[0].client.send({ type: 'pickColor', color: 'green', player: 2 });
+  await until(() => ctx.getGame().players[0].color);
+  assert.equal(ctx.getGame().players[2].color, null, 'le siège est imposé par l\'hôte, pas par le téléphone');
+  await until(() => ctx.phones.every((p) => p.got.views.at(-1).view.players[0].color === 'green'));
 });
 
 test('une action illégale revient en erreur au bon téléphone seulement', async () => {
@@ -135,7 +135,7 @@ test('une action illégale revient en erreur au bon téléphone seulement', asyn
   await start(ctx);
   await ctx.phones[1].client.send({ type: 'roll' });
   await until(() => ctx.phones[1].got.errors.length > 0);
-  assert.match(ctx.phones[1].got.errors[0], /tour|maintenant|dé/i);
+  assert.match(ctx.phones[1].got.errors[0], /tour|maintenant|dé|couleur/i);
   assert.equal(ctx.phones[0].got.errors.length, 0);
 });
 
@@ -143,7 +143,7 @@ test('une action rejouée (même numéro) est ignorée', async () => {
   const ctx = await setup(3);
   await start(ctx);
   const key = await Net.deriveKey(ctx.phones[0].identity.priv, ctx.hostId.pub);
-  const msg = { n: 5000, action: { type: 'rollOrder' } };
+  const msg = { n: 5000, action: { type: 'pickColor', color: 'red' } };
   for (let i = 0; i < 2; i++) await Net.emitSealed(ctx.phones[0].room, 'a', key, msg, 'x');
   await wait(100);
   assert.equal(ctx.acts.length, 1);
@@ -199,12 +199,12 @@ test('perte de messages : le téléphone se resynchronise par sa présence', asy
   const ctx = await setup(2);
   await start(ctx);
   ctx.hub.drop = 1;
-  ctx.phones[0].client.send({ type: 'rollOrder' }).catch(() => {});
+  ctx.phones[0].client.send({ type: 'pickColor', color: 'red' }).catch(() => {});
   ctx.hub.drop = 0;
   await wait(50);
   // un nouvel envoi passe ; l'hôte republie, et la présence de chaque téléphone rattrape la version
-  await ctx.phones[0].client.send({ type: 'rollOrder' });
-  await until(() => ctx.phones.every((p) => p.got.views.at(-1).view.order.rolls[0].length));
+  await ctx.phones[0].client.send({ type: 'pickColor', color: 'blue' });
+  await until(() => ctx.phones.every((p) => p.got.views.at(-1).view.players[0].color));
 });
 
 test('vues perdues au lancement : l\'hôte rattrape tout seul en quelques secondes', async () => {
@@ -255,7 +255,7 @@ test('celui qui vient d\'agir reçoit sa vue en premier', async () => {
   });
   const stamp = [];
   ctx.phones.forEach((p, i) => p.room.on('v', (msg) => { if (msg.data.to === Net.fp(p.identity.pub)) stamp.push(i); }));
-  await ctx.phones[0].client.send({ type: 'rollOrder' });
+  await ctx.phones[0].client.send({ type: 'pickColor', color: 'red' });
   await until(() => stamp.length >= 3);
   assert.equal(stamp[0], 0);
   void order;
