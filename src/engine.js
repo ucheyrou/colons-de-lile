@@ -52,8 +52,9 @@
     c.board = board;
     return c;
   }
-  function log(s, text) {
-    s.log.push(text);
+  // Une ligne de journal porte le joueur qui agit (p), pour que l'interface la colore.
+  function log(s, text, p) {
+    s.log.push(p == null ? { t: text } : { t: text, p });
     if (s.log.length > 300) s.log.splice(0, s.log.length - 300);
   }
   const nameOf = (s, p) => s.players[p].name;
@@ -344,8 +345,9 @@
     });
     const byPlayer = {};
     gains.forEach(([o, res, k]) => { (byPlayer[o] = byPlayer[o] || []).push(k + ' ' + RES_FR[res]); });
-    const parts = Object.keys(byPlayer).map((o) => nameOf(s, +o) + ' reçoit ' + byPlayer[o].join(', '));
-    log(s, parts.length ? parts.join(' ; ') + '.' : 'Personne ne produit.');
+    const owners = Object.keys(byPlayer).map(Number);
+    owners.forEach((o) => log(s, nameOf(s, o) + ' reçoit ' + byPlayer[o].join(', ') + '.', o));
+    if (!owners.length) log(s, 'Personne ne produit.');
   }
 
   function startRobber(s, returnStep) {
@@ -361,7 +363,7 @@
     const r = pool[rint(s, pool.length)];
     v.hand[r]--;
     s.players[thief].hand[r]++;
-    log(s, nameOf(s, thief) + ' vole une carte à ' + nameOf(s, victim) + '.');
+    log(s, nameOf(s, thief) + ' vole une carte à ' + nameOf(s, victim) + '.', thief);
   }
 
   function checkRoadAndArmy(s) {
@@ -374,7 +376,7 @@
       if (prev !== null && top.includes(prev)) holder = prev;
       else if (top.length === 1) holder = top[0];
     }
-    if (holder !== prev && holder !== null) log(s, nameOf(s, holder) + ' obtient la plus longue route (' + max + ').');
+    if (holder !== prev && holder !== null) log(s, nameOf(s, holder) + ' obtient la plus longue route (' + max + ').', holder);
     if (holder !== prev && holder === null) log(s, 'Plus personne n\'a la plus longue route.');
     s.longestRoad = { holder, len: holder === null ? 0 : max };
     s.players.forEach((p, i) => { p.roadLen = lens[i]; });
@@ -387,7 +389,7 @@
         best = p.knights;
       }
     });
-    if (ah !== s.largestArmy.holder) log(s, nameOf(s, ah) + ' obtient la plus grande armée (' + best + ').');
+    if (ah !== s.largestArmy.holder) log(s, nameOf(s, ah) + ' obtient la plus grande armée (' + best + ').', ah);
     s.largestArmy = { holder: ah, size: best };
   }
 
@@ -398,7 +400,7 @@
       s.step = 'ended';
       s.winner = s.turn;
       s.trade = null;
-      log(s, nameOf(s, s.turn) + ' remporte la partie avec ' + points(s, s.turn, true) + ' points !');
+      log(s, nameOf(s, s.turn) + ' remporte la partie avec ' + points(s, s.turn, true) + ' points !', s.turn);
     }
   }
 
@@ -423,7 +425,7 @@
     const d = rint(s, 6) + 1;
     s.order.rolls[a.player].push(d);
     s.order.pending = s.order.pending.filter((p) => p !== a.player);
-    log(s, nameOf(s, a.player) + ' lance le dé : ' + d + '.');
+    log(s, nameOf(s, a.player) + ' lance le dé : ' + d + '.', a.player);
     if (!s.order.pending.length) settleOrder(s);
   };
 
@@ -445,7 +447,7 @@
     s.phase = 'setup';
     s.step = 'settlement';
     s.turn = top[0];
-    log(s, nameOf(s, top[0]) + ' a le plus grand dé (' + best + ') et pose sa colonie en premier.');
+    log(s, nameOf(s, top[0]) + ' a le plus grand dé (' + best + ') et pose sa colonie en premier.', top[0]);
   }
 
   handlers.placeSettlement = (s, a) => {
@@ -462,10 +464,10 @@
           const res = TERRAIN_RES[s.board.hexes[hid].terrain];
           if (res && s.bank[res] > 0) { grant(s, p, res, 1); got.push(RES_FR[res]); }
         });
-        if (got.length) log(s, p.name + ' reçoit ' + got.join(', ') + '.');
+        if (got.length) log(s, p.name + ' reçoit ' + got.join(', ') + '.', p.id);
       }
       s.step = 'road';
-      log(s, p.name + ' pose une colonie.');
+      log(s, p.name + ' pose une colonie.', p.id);
       return;
     }
     mainActions(s, a);
@@ -475,7 +477,7 @@
     pay(s, p, COST.settlement);
     s.buildings[a.vertex] = { owner: a.player, type: 'settlement' };
     clearTrade(s);
-    log(s, p.name + ' construit une colonie.');
+    log(s, p.name + ' construit une colonie.', p.id);
   };
 
   handlers.placeCity = (s, a) => {
@@ -487,7 +489,7 @@
     pay(s, p, COST.city);
     s.buildings[a.vertex].type = 'city';
     clearTrade(s);
-    log(s, p.name + ' transforme une colonie en ville.');
+    log(s, p.name + ' transforme une colonie en ville.', p.id);
   };
 
   handlers.placeRoad = (s, a) => {
@@ -497,14 +499,14 @@
       need(s.step === 'road', 'Pose d\'abord ta colonie.');
       need(legalRoads(s, a.player, s.setup.last).includes(a.edge), 'La route doit toucher ta nouvelle colonie.');
       s.roads[a.edge] = a.player;
-      log(s, p.name + ' pose une route.');
+      log(s, p.name + ' pose une route.', p.id);
       s.setup.idx++;
       if (s.setup.idx >= s.setup.order.length) {
         s.phase = 'main';
         s.step = 'roll';
         s.turn = s.setup.order[s.setup.order.length - 1];
         s.turnNo = 1;
-        log(s, 'Mise en place terminée. ' + nameOf(s, s.turn) + ' commence.');
+        log(s, 'Mise en place terminée. ' + nameOf(s, s.turn) + ' commence.', s.turn);
       } else {
         s.turn = s.setup.order[s.setup.idx];
         s.step = 'settlement';
@@ -517,7 +519,7 @@
     if (s.step === 'roadBuilding') {
       s.roads[a.edge] = a.player;
       s.freeRoads--;
-      log(s, p.name + ' pose une route gratuite.');
+      log(s, p.name + ' pose une route gratuite.', p.id);
       if (s.freeRoads <= 0 || roadsOf(s, a.player) >= LIMITS.road || !legalRoads(s, a.player).length) {
         s.freeRoads = 0;
         s.step = s.returnStep;
@@ -529,7 +531,7 @@
     pay(s, p, COST.road);
     s.roads[a.edge] = a.player;
     clearTrade(s);
-    log(s, p.name + ' construit une route.');
+    log(s, p.name + ' construit une route.', p.id);
   };
 
   handlers.roll = (s, a) => {
@@ -538,7 +540,7 @@
     const d1 = rint(s, 6) + 1, d2 = rint(s, 6) + 1;
     s.dice = [d1, d2];
     const sum = d1 + d2;
-    log(s, nameOf(s, a.player) + ' lance les dés : ' + d1 + ' + ' + d2 + ' = ' + sum + '.');
+    log(s, nameOf(s, a.player) + ' lance les dés : ' + d1 + ' + ' + d2 + ' = ' + sum + '.', a.player);
     if (sum !== 7) {
       produce(s, sum);
       s.step = 'actions';
@@ -571,7 +573,7 @@
     need(has(p.hand, cards), 'Tu n\'as pas ces cartes.');
     pay(s, p, cards);
     delete s.discard[a.player];
-    log(s, p.name + ' défausse ' + n + ' cartes.');
+    log(s, p.name + ' défausse ' + n + ' cartes.', p.id);
     if (!Object.keys(s.discard).length) startRobber(s, 'actions');
   };
 
@@ -586,7 +588,7 @@
       const b = s.buildings[v];
       if (b && b.owner !== a.player && total(s.players[b.owner].hand) > 0 && !victims.includes(b.owner)) victims.push(b.owner);
     });
-    log(s, nameOf(s, a.player) + ' déplace le voleur.');
+    log(s, nameOf(s, a.player) + ' déplace le voleur.', a.player);
     if (victims.length === 0) s.step = s.returnStep;
     else if (victims.length === 1) { stealFrom(s, a.player, victims[0]); s.step = s.returnStep; }
     else { s.victims = victims; s.step = 'steal'; }
@@ -610,7 +612,7 @@
     const k = s.devDeck.pop();
     p.dev.push({ k, t: s.turnNo });
     clearTrade(s);
-    log(s, p.name + ' achète une carte de développement.');
+    log(s, p.name + ' achète une carte de développement.', p.id);
   };
 
   function useDev(s, a, kind) {
@@ -630,7 +632,7 @@
     const prev = s.step;
     const p = useDev(s, a, 'knight');
     p.knights++;
-    log(s, p.name + ' joue un chevalier.');
+    log(s, p.name + ' joue un chevalier.', p.id);
     startRobber(s, prev);
   };
 
@@ -641,7 +643,7 @@
     s.freeRoads = Math.min(2, LIMITS.road - roadsOf(s, a.player));
     s.returnStep = prev;
     s.step = 'roadBuilding';
-    log(s, p.name + ' joue Construction de routes.');
+    log(s, p.name + ' joue Construction de routes.', p.id);
   };
 
   handlers.playYearOfPlenty = (s, a) => {
@@ -653,7 +655,7 @@
     const p = useDev(s, a, 'yearOfPlenty');
     grant(s, p, a.a, 1);
     grant(s, p, a.b, 1);
-    log(s, p.name + ' joue Invention et prend ' + RES_FR[a.a] + ' et ' + RES_FR[a.b] + '.');
+    log(s, p.name + ' joue Invention et prend ' + RES_FR[a.a] + ' et ' + RES_FR[a.b] + '.', p.id);
   };
 
   handlers.playMonopoly = (s, a) => {
@@ -666,7 +668,7 @@
       p.hand[a.res] += o.hand[a.res];
       o.hand[a.res] = 0;
     });
-    log(s, p.name + ' joue Monopole sur ' + RES_FR[a.res] + ' et récupère ' + n + ' carte(s).');
+    log(s, p.name + ' joue Monopole sur ' + RES_FR[a.res] + ' et récupère ' + n + ' carte(s).', p.id);
   };
 
   handlers.bankTrade = (s, a) => {
@@ -680,7 +682,7 @@
     s.bank[a.give] += ratio;
     grant(s, p, a.get, 1);
     clearTrade(s);
-    log(s, p.name + ' échange ' + ratio + ' ' + RES_FR[a.give] + ' contre 1 ' + RES_FR[a.get] + ' à la banque.');
+    log(s, p.name + ' échange ' + ratio + ' ' + RES_FR[a.give] + ' contre 1 ' + RES_FR[a.get] + ' à la banque.', p.id);
   };
 
   function cleanBundle(b) {
@@ -700,7 +702,7 @@
     need(!RES.some((r) => give[r] > 0 && want[r] > 0), 'Ne demande pas la ressource que tu donnes.');
     need(has(s.players[a.player].hand, give), 'Tu n\'as pas ces cartes.');
     s.trade = { from: a.player, give, want, responses: {} };
-    log(s, nameOf(s, a.player) + ' propose un échange.');
+    log(s, nameOf(s, a.player) + ' propose un échange.', a.player);
   };
 
   handlers.respondTrade = (s, a) => {
@@ -722,7 +724,7 @@
       they.hand[r] += t.give[r] - t.want[r];
     });
     s.trade = null;
-    log(s, me.name + ' et ' + they.name + ' concluent un échange.');
+    log(s, me.name + ' et ' + they.name + ' concluent un échange.', me.id);
   };
 
   handlers.cancelTrade = (s, a) => {
@@ -739,7 +741,7 @@
     s.step = 'roll';
     s.dice = null;
     s.devPlayed = false;
-    log(s, 'Au tour de ' + nameOf(s, s.turn) + '.');
+    log(s, 'Au tour de ' + nameOf(s, s.turn) + '.', s.turn);
   };
 
   function apply(state, action) {

@@ -42,7 +42,7 @@
   const ui = {
     screen: 'menu', pin: null, mode: null, tradeOpen: false, tab: 'bank', bankGive: null, bankGet: null,
     give: zero(), want: zero(), discard: zero(), pick: null, yop: [], toast: '', confirmNew: false,
-    count: 3, names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: '', orderSeen: null, lastTurn: -1, fxKey: null, fx: null, fxNow: null, fxTimer: 0, gain: null, gainTimer: 0, lastHand: null,
+    count: 3, names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: '', orderSeen: null, pieces: null, news: [], newsNow: [], newsTimer: 0, lastTurn: -1, fxKey: null, fx: null, fxNow: null, fxTimer: 0, gain: null, gainTimer: 0, lastHand: null,
     code: '', joinCode: '', myName: '', error: '', busy: false,
     seat: -1, boardSeed: null, board: null, conn: 'searching', lobby: [], pending: 0, phoneTab: 'hand', needBoard: false, wasNeed: false, wasMine: false,
   };
@@ -195,12 +195,14 @@
       out.push('<line class="tgt-e"' + c + '/><line class="hit hit-e" data-e="' + id + '"' + c + '/>');
     });
 
+    ui.newsNow.forEach((n) => {
+      const at = n.kind === 'road' ? edgeMid(b, n.at) : b.vertices[n.at];
+      out.push('<circle class="fx-new" cx="' + X(at.x) + '" cy="' + X(at.y) + '" r="34" stroke="' + pcolor(n.owner) + '" style="--el:-' + n.elapsed + 'ms"/>');
+    });
+
     Object.keys(s.buildings).forEach((k) => {
       const v = b.vertices[+k], bd = s.buildings[k];
-      const d = bd.type === 'city'
-        ? 'M-15 10V-2H-6V-12L2-19 10-12V-2H15V10Z'
-        : 'M-11 10V-2L0-13 11-2V10Z';
-      out.push('<g transform="translate(' + X(v.x) + ' ' + X(v.y) + ') scale(1.25)"><path class="piece" d="' + d + '" fill="' + pcolor(bd.owner) + '"/></g>');
+      out.push('<g transform="translate(' + X(v.x) + ' ' + X(v.y) + ') scale(1.25)"><path class="piece" d="' + PIECE_PATH[bd.type] + '" fill="' + pcolor(bd.owner) + '"/></g>');
     });
 
     tg.vertices.forEach((id) => {
@@ -222,7 +224,49 @@
     return out.join('');
   }
 
-  function resetFx() { ui.fxKey = null; ui.fx = null; ui.fxNow = null; ui.gain = null; ui.lastHand = null; ui.orderSeen = null; }
+  function resetFx() { ui.fxKey = null; ui.fx = null; ui.fxNow = null; ui.gain = null; ui.lastHand = null; ui.orderSeen = null; ui.pieces = null; ui.news = []; }
+
+  // ---------- Annonce des constructions : on compare les pièces au rendu précédent ----------
+  const NEWS_MS = 3800;
+  const PIECE_PATH = { settlement: 'M-11 10V-2L0-13 11-2V10Z', city: 'M-15 10V-2H-6V-12L2-19 10-12V-2H15V10Z' };
+  const NEWS_TEXT = { road: 'pose une route', settlement: 'construit une colonie', city: 'construit une ville' };
+  const edgeMid = (b, id) => { const e = b.edges[id]; return { x: (b.vertices[e.a].x + b.vertices[e.b].x) / 2, y: (b.vertices[e.a].y + b.vertices[e.b].y) / 2 }; };
+  function trackBuilds() {
+    const s = game;
+    const now = { roads: Object.assign({}, s.roads), buildings: {} };
+    Object.keys(s.buildings).forEach((k) => { now.buildings[k] = s.buildings[k].type; });
+    const prev = ui.pieces;
+    ui.pieces = now;
+    if (!prev) return;
+    const t = Date.now();
+    const added = [];
+    Object.keys(now.roads).forEach((k) => { if (prev.roads[k] === undefined) added.push({ kind: 'road', at: +k, owner: now.roads[k], t }); });
+    Object.keys(now.buildings).forEach((k) => {
+      if (now.buildings[k] !== prev.buildings[k]) added.push({ kind: now.buildings[k], at: +k, owner: s.buildings[k].owner, t });
+    });
+    if (!added.length) return;
+    ui.news = ui.news.filter((n) => t - n.t < NEWS_MS).concat(added).slice(-3);
+    clearTimeout(ui.newsTimer);
+    ui.newsTimer = setTimeout(render, NEWS_MS + 80);
+  }
+  function activeNews() {
+    const t = Date.now();
+    ui.news = ui.news.filter((n) => t - n.t < NEWS_MS);
+    return ui.news.map((n) => Object.assign({ elapsed: t - n.t }, n));
+  }
+  function pieceIcon(kind, owner) {
+    const c = pcolor(owner);
+    const shape = kind === 'road'
+      ? '<line x1="-13" y1="5" x2="13" y2="-7" stroke="#1b1b1b" stroke-width="9" stroke-linecap="round"/><line x1="-13" y1="5" x2="13" y2="-7" stroke="' + c + '" stroke-width="5" stroke-linecap="round"/>'
+      : '<path class="piece" d="' + PIECE_PATH[kind] + '" fill="' + c + '"/>';
+    return '<svg class="piece-ico" viewBox="-18 -21 36 33" aria-hidden="true">' + shape + '</svg>';
+  }
+  function renderNews() {
+    const html = ui.newsNow.map((n) => '<div class="news-item" style="--pc:' + pcolor(n.owner) + ';--el:-' + n.elapsed + 'ms">' +
+      pieceIcon(n.kind, n.owner) + '<span><b>' + esc(game.players[n.owner].name) + '</b> ' + NEWS_TEXT[n.kind] + '</span></div>').join('');
+    $('news').innerHTML = mode === 'client' ? '' : html;
+    $('phoneNews').innerHTML = mode === 'client' ? html : '';
+  }
 
   // ---------- Animation du lancer : les tuiles qui produisent passent au premier plan ----------
   const FX_MS = 4200;
@@ -522,7 +566,10 @@
   }
 
   function logHTML() {
-    const lines = game.log.slice(-60).map((l) => '<li>' + esc(l) + '</li>').join('');
+    const lines = game.log.slice(-60).map((l) => {
+      const e = typeof l === 'string' ? { t: l } : l; // sauvegardes d'avant la couleur par joueur
+      return e.p == null ? '<li>' + esc(e.t) + '</li>' : '<li class="by" style="--pc:' + pcolor(e.p) + '"><span class="dot"></span>' + esc(e.t) + '</li>';
+    }).join('');
     return '<h2>Journal</h2><ol>' + lines + '</ol>';
   }
 
@@ -659,7 +706,9 @@
     if (mode === 'local' && game.turn !== ui.lastTurn) { ui.pin = null; ui.lastTurn = game.turn; }
     trackRoll();
     trackGain();
+    trackBuilds();
     ui.fxNow = activeFx();
+    ui.newsNow = activeNews();
     $('board').innerHTML = boardHTML();
     $('board').setAttribute('class', ui.fxNow ? 'fx-on' : '');
     if (ui.fxNow) $('board').style.setProperty('--el', '-' + ui.fxNow.elapsed + 'ms');
@@ -679,6 +728,7 @@
     }
     $('scores').innerHTML = scoresHTML();
     renderLog();
+    renderNews();
     const over = $('over');
     over.innerHTML = overHTML();
     over.hidden = game.phase !== 'ended';
