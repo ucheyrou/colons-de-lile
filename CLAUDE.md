@@ -46,7 +46,8 @@ Ne publie l'artefact qu'après `node --test` et `node build.mjs` verts.
 - Site : https://ucheyrou.github.io/colons-de-lile/ (dépôt public `ucheyrou/colons-de-lile`, Pages sur `main` dossier `/docs`).
 - Mise à jour : `node build.mjs`, puis commit de `docs/` et `git push`. Le site se reconstruit en une minute.
 - Les commits utilisent l'e-mail noreply GitHub (jamais l'adresse d'école de la config globale).
-- Sur le site, les téléphones passent par des courtiers MQTT publics (`src/mqtt-room.js`) : connexion simultanée à HiveMQ et EMQX, chaque message envoyé sur les deux, le premier arrivé gagne, doublons ignorés. Ne pas revenir à « un seul courtier au choix » : écran et téléphone pourraient se retrouver sur deux courtiers différents. Le QR code ouvre `site#j=CODE` : code déjà rempli.
+- Sur le site, les téléphones passent par des courtiers MQTT publics (`src/mqtt-room.js`, liste `BROKERS`) : connexion simultanée à tous (shiftr.io et itdata.nu sur le port 443, HiveMQ et EMQX en secours), chaque message envoyé sur tous, le premier arrivé gagne, doublons ignorés. Ne pas revenir à « un seul courtier au choix » : écran et téléphone pourraient se retrouver sur deux courtiers différents.
+- Les courtiers gratuits tombent sans prévenir (HiveMQ et EMQX en octobre 2026). Si « Impossible de joindre le serveur de salle » : `node test/mqtt-live.mjs` (hors bac à sable : le bac à sable de Claude Code fausse les connexions MQTT) pour voir lesquels répondent, et remplacer les morts. Le QR code ouvre `site#j=CODE` : code déjà rempli.
 - Le canal est choisi automatiquement : capacité `room` si on est dans un artefact, MQTT sinon. Les deux mondes ne communiquent pas entre eux.
 
 ## Publication (artefact)

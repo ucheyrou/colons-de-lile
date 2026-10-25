@@ -13,7 +13,8 @@ async function until(fn, ms = 10000, what = '') {
 const code = 'T' + Math.random().toString(36).slice(2, 5);
 
 const roomH = await MqttRoom.join(code);
-console.log('courtiers actifs :', roomH.brokers().length);
+await wait(1500);
+console.log('courtiers actifs :', roomH.brokers().join(', '));
 let game = E.newGame({ names: ['Alice', 'Bruno'], seed: 11 });
 const host = Net.createHost({
   room: roomH, identity: await Net.newIdentity(),
@@ -43,10 +44,9 @@ host.setStatus('play');
 await until(() => phones.every((p) => p.got.views.length), 10000, 'vues initiales');
 console.log('vues initiales reçues en', Date.now() - t0, 'ms');
 const seat0 = phones.find((p) => p.got.views[0].seat === 0);
-const v = E.available(game, 0).targets.vertices[0];
 const t1 = Date.now();
-await seat0.client.send({ type: 'placeSettlement', vertex: v });
-await until(() => phones.every((p) => p.got.views.at(-1).view.buildings[v]), 10000, 'action propagée');
+await seat0.client.send({ type: 'pickColor', color: 'blue' });
+await until(() => phones.every((p) => p.got.views.at(-1).view.players[0].color === 'blue'), 10000, 'action propagée');
 console.log('action → vue mise à jour chez tous en', Date.now() - t1, 'ms');
 const mine = seat0.got.views.at(-1).view.players[0];
 const other = seat0.got.views.at(-1).view.players[1];

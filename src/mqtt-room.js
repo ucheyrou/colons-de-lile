@@ -10,11 +10,14 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  // Connexion simultanée aux deux : le plus rapide gagne, l'autre sert de secours.
+  // Connexion simultanée à tous : le plus rapide gagne, les autres servent de secours.
+  // Les deux premiers passent par le port 443, rarement bloqué ; HiveMQ et EMQX sont tombés en octobre 2026.
   // (test.mosquitto.org a été écarté : connexions et testaments trop irréguliers.)
   const BROKERS = [
-    'wss://broker.hivemq.com:8884/mqtt',
-    'wss://broker.emqx.io:8084/mqtt',
+    { url: 'wss://public.cloud.shiftr.io/mqtt', user: 'public', pass: 'public' },
+    { url: 'wss://broker.itdata.nu/mqtt' },
+    { url: 'wss://broker.hivemq.com:8884/mqtt' },
+    { url: 'wss://broker.emqx.io:8084/mqtt' },
   ];
   const PREFIX = 'colons-v1';
   const KEEPALIVE = 30;
@@ -45,9 +48,9 @@
     return Uint8Array.from(out);
   }
   const packet = (header, body) => concat(Uint8Array.of(header), varint(body.length), body);
-  const connectPacket = (clientId, willTopic) => packet(0x10, concat(
-    str('MQTT'), Uint8Array.of(4, 0x02 | 0x04 | 0x20, KEEPALIVE >> 8, KEEPALIVE & 255),
-    str(clientId), str(willTopic), Uint8Array.of(0, 0)));
+  const connectPacket = (clientId, willTopic, user, pass) => packet(0x10, concat(
+    str('MQTT'), Uint8Array.of(4, 0x02 | 0x04 | 0x20 | (user ? 0xc0 : 0), KEEPALIVE >> 8, KEEPALIVE & 255),
+    str(clientId), str(willTopic), Uint8Array.of(0, 0), user ? concat(str(user), str(pass)) : new Uint8Array(0)));
   const subscribePacket = (id, filter) => packet(0x82, concat(Uint8Array.of(id >> 8, id & 255), str(filter), Uint8Array.of(0)));
   const publishPacket = (topic, payload, retain) => packet(0x30 | (retain ? 1 : 0), concat(str(topic), payload));
   const PING = Uint8Array.of(0xc0, 0);
@@ -83,16 +86,16 @@
   }
 
   // ---------- Connexion à un courtier ----------
-  function openSocket(url, clientId, willTopic, WS) {
+  function openSocket(broker, clientId, willTopic, WS) {
     return new Promise((resolve, reject) => {
       let ws;
-      try { ws = new WS(url, 'mqtt'); } catch (e) { reject(e); return; }
+      try { ws = new WS(broker.url, 'mqtt'); } catch (e) { reject(e); return; }
       ws.binaryType = 'arraybuffer';
       const reader = new Reader();
       let done = false;
       const timer = setTimeout(() => fail(new Error('délai dépassé')), 7000);
       function fail(e) { if (done) return; done = true; clearTimeout(timer); try { ws.close(); } catch (x) { /* ignore */ } reject(e); }
-      ws.onopen = () => ws.send(connectPacket(clientId, willTopic));
+      ws.onopen = () => ws.send(connectPacket(clientId, willTopic, broker.user, broker.pass));
       ws.onerror = () => fail(new Error('connexion refusée'));
       ws.onclose = () => fail(new Error('connexion fermée'));
       ws.onmessage = (ev) => {
@@ -137,7 +140,7 @@
     let selfUpdated = Date.now();
 
     const now = () => Date.now();
-    const links = brokers.map((url) => ({ url, ws: null, up: false, retry: 0, ping: 0, timer: 0 }));
+    const links = brokers.map((broker) => ({ broker, ws: null, up: false, retry: 0, ping: 0, timer: 0 }));
     const anyUp = () => links.some((l) => l.up);
     const send = (bytes) => links.forEach((l) => { if (l.up && l.ws && l.ws.readyState === 1) l.ws.send(bytes); });
 
@@ -210,7 +213,7 @@
     async function connectLink(l) {
       if (closed) return;
       try {
-        const c = await openSocket(l.url, peerId, willTopic, WS);
+        const c = await openSocket(l.broker, peerId, willTopic, WS);
         if (closed) { try { c.ws.close(); } catch (e) { /* ignore */ } return; }
         l.ws = c.ws; l.up = true; l.retry = 0;
         const reader = c.reader;
@@ -256,7 +259,7 @@
     return {
       name: room,
       peerId,
-      brokers: () => links.filter((l) => l.up).map((l) => l.url),
+      brokers: () => links.filter((l) => l.up).map((l) => l.broker.url),
       connected: anyUp,
       onConnection(h) { connHandlers.add(h); Promise.resolve().then(() => h(anyUp())); return () => connHandlers.delete(h); },
       async emit(topic, data) {

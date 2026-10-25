@@ -12,7 +12,7 @@ const code = () => 'T' + Math.random().toString(36).slice(2, 5);
 
 let failed = 0;
 for (const broker of MqttRoom.BROKERS) {
-  const name = new URL(broker).host;
+  const name = new URL(broker.url).host;
   try {
     const c = code();
     const t0 = Date.now();
@@ -52,7 +52,7 @@ for (const broker of MqttRoom.BROKERS) {
 // Multi-courtiers : un courtier mort ne gêne pas, et un message reçu par plusieurs courtiers n'est livré qu'une fois.
 try {
   const c = code();
-  const dead = 'wss://localhost:1/mqtt';
+  const dead = { url: 'wss://localhost:1/mqtt' };
   const a = await MqttRoom.join(c, { brokers: [dead, ...MqttRoom.BROKERS] });
   const b = await MqttRoom.join(c, { brokers: [...MqttRoom.BROKERS, dead] });
   const got = [];
