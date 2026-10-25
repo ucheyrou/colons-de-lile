@@ -171,10 +171,13 @@
 
     Object.keys(s.roads).forEach((k) => {
       const e = b.edges[+k], A = b.vertices[e.a], B = b.vertices[e.b];
+      const fresh = newsAt('road', +k);
+      if (fresh) out.push('<g class="drop-road" style="--el:-' + fresh.elapsed + 'ms">');
       const ax = X(A.x + (B.x - A.x) * 0.14), ay = X(A.y + (B.y - A.y) * 0.14);
       const bx = X(A.x + (B.x - A.x) * 0.86), by = X(A.y + (B.y - A.y) * 0.86);
       out.push('<line x1="' + ax + '" y1="' + ay + '" x2="' + bx + '" y2="' + by + '" stroke="#1b1b1b" stroke-width="15" stroke-linecap="round"/>');
       out.push('<line x1="' + ax + '" y1="' + ay + '" x2="' + bx + '" y2="' + by + '" stroke="' + pcolor(s.roads[k]) + '" stroke-width="9" stroke-linecap="round"/>');
+      if (fresh) out.push('</g>');
     });
 
     const fx = ui.fxNow;
@@ -202,7 +205,10 @@
 
     Object.keys(s.buildings).forEach((k) => {
       const v = b.vertices[+k], bd = s.buildings[k];
-      out.push('<g transform="translate(' + X(v.x) + ' ' + X(v.y) + ') scale(1.25)"><path class="piece" d="' + PIECE_PATH[bd.type] + '" fill="' + pcolor(bd.owner) + '"/></g>');
+      const fresh = newsAt('building', +k);
+      const piece = '<path class="piece" d="' + PIECE_PATH[bd.type] + '" fill="' + pcolor(bd.owner) + '"/>';
+      out.push('<g transform="translate(' + X(v.x) + ' ' + X(v.y) + ') scale(1.25)">' +
+        (fresh ? '<g class="drop" style="--el:-' + fresh.elapsed + 'ms">' + piece + '</g>' : piece) + '</g>');
     });
 
     tg.vertices.forEach((id) => {
@@ -226,10 +232,16 @@
 
   function resetFx() { ui.fxKey = null; ui.fx = null; ui.fxNow = null; ui.gain = null; ui.lastHand = null; ui.orderSeen = null; ui.pieces = null; ui.news = []; }
 
-  // ---------- Annonce des constructions : on compare les pièces au rendu précédent ----------
-  const NEWS_MS = 3800;
+  // ---------- Annonce des constructions, façon écran de bowling : on compare les pièces au rendu précédent ----------
+  const NEWS_MS = 3200;
   const PIECE_PATH = { settlement: 'M-11 10V-2L0-13 11-2V10Z', city: 'M-15 10V-2H-6V-12L2-19 10-12V-2H15V10Z' };
-  const NEWS_TEXT = { road: 'pose une route', settlement: 'construit une colonie', city: 'construit une ville' };
+  const NEWS = {
+    road: { word: 'ROUTE !', text: 'pose une route' },
+    settlement: { word: 'COLONIE !', text: 'construit une colonie', pts: 1 },
+    city: { word: 'VILLE !', text: 'construit une ville', pts: 1 },
+  };
+  const CONFETTI = ['var(--pc)', '#ffd34d', '#ffffff', '#5fd0e0', 'var(--pc)', '#ff7a59'];
+  const newsAt = (kind, at) => ui.newsNow.find((n) => (kind === 'road') === (n.kind === 'road') && n.at === at);
   const edgeMid = (b, id) => { const e = b.edges[id]; return { x: (b.vertices[e.a].x + b.vertices[e.b].x) / 2, y: (b.vertices[e.a].y + b.vertices[e.b].y) / 2 }; };
   function trackBuilds() {
     const s = game;
@@ -259,11 +271,28 @@
     const shape = kind === 'road'
       ? '<line x1="-13" y1="5" x2="13" y2="-7" stroke="#1b1b1b" stroke-width="9" stroke-linecap="round"/><line x1="-13" y1="5" x2="13" y2="-7" stroke="' + c + '" stroke-width="5" stroke-linecap="round"/>'
       : '<path class="piece" d="' + PIECE_PATH[kind] + '" fill="' + c + '"/>';
-    return '<svg class="piece-ico" viewBox="-18 -21 36 33" aria-hidden="true">' + shape + '</svg>';
+    return '<svg class="bowl-piece" viewBox="-18 -21 36 33" aria-hidden="true">' + shape + '</svg>';
+  }
+  // Positions des confettis fixes par indice : un nouveau rendu en pleine animation ne les déplace pas.
+  function confettiHTML(n) {
+    return Array.from({ length: n }, (_, i) => {
+      const a = (i / n) * 2 * Math.PI + (i % 3) * 0.17;
+      const d = 150 + (i * 47) % 110;
+      return '<i style="--c:' + CONFETTI[i % CONFETTI.length] + ';--x:' + Math.round(Math.cos(a) * d) + 'px;--y:' + Math.round(Math.sin(a) * d * 0.8 - 40) + 'px;--r:' + (300 + (i * 97) % 500) + 'deg;--i:' + (i % 4) + '"></i>';
+    }).join('');
   }
   function renderNews() {
-    const html = ui.newsNow.map((n) => '<div class="news-item" style="--pc:' + pcolor(n.owner) + ';--el:-' + n.elapsed + 'ms">' +
-      pieceIcon(n.kind, n.owner) + '<span><b>' + esc(game.players[n.owner].name) + '</b> ' + NEWS_TEXT[n.kind] + '</span></div>').join('');
+    const n = ui.newsNow[ui.newsNow.length - 1];
+    let html = '';
+    if (n) {
+      const info = NEWS[n.kind];
+      const letters = Array.from(info.word).map((ch, i) => '<span style="--i:' + i + '">' + (ch === ' ' ? '&nbsp;' : esc(ch)) + '</span>').join('');
+      html = '<div class="bowl' + (n.kind === 'road' ? ' small' : '') + '" style="--pc:' + pcolor(n.owner) + ';--el:-' + n.elapsed + 'ms"><div class="bowl-in">' +
+        '<div class="bowl-rays"></div><div class="bowl-confetti">' + confettiHTML(n.kind === 'road' ? 10 : 22) + '</div>' +
+        pieceIcon(n.kind, n.owner) + '<div class="bowl-word" aria-hidden="true">' + letters + '</div>' +
+        '<div class="bowl-who"><span class="dot"></span><span><b>' + esc(game.players[n.owner].name) + '</b> ' + info.text + '</span></div>' +
+        (info.pts ? '<div class="bowl-stamp">+' + info.pts + ' pt</div>' : '') + '</div></div>';
+    }
     $('news').innerHTML = mode === 'client' ? '' : html;
     $('phoneNews').innerHTML = mode === 'client' ? html : '';
   }
