@@ -23,12 +23,15 @@ const check = (ok, msg) => { console.log(ok ? 'OK    ' : 'ÉCHEC ', msg); if (!o
 
 click(q('[data-act=goto][data-s=setup]'));
 click(q('[data-act=start]'));
+check(/Qui commence/.test(q('#banner').textContent), 'la partie s\'ouvre sur le tirage au dé');
+for (let i = 0; i < 30 && q('[data-act=roll-order]'); i++) click(q('[data-act=roll-order]'));
+check(!q('[data-act=roll-order]') && qa('#board [data-v]').length > 0, 'ordre décidé, le premier pose sa colonie');
 for (let i = 0; i < 40 && q('#board [data-v], #board [data-e]'); i++) click(q('#board [data-v], #board [data-e]'));
 check(!!q('[data-act=roll]'), 'mise en place terminée, prêt à lancer');
 check(qa('.fx-hex').length === 0, 'rien n\'est animé avant le premier lancer');
 
 // On joue jusqu'à voir un lancer qui produit quelque chose chez quelqu'un.
-let seenGain = null, rolls = 0, snapshot = false;
+let seenGain = null, rolls = 0, snapshot = false, checked = '';
 for (let i = 0; i < 400 && !seenGain; i++) {
   const prio = ['roll', 'discard', 'steal'].map((a) => q('#hand [data-act=' + a + ']:not(:disabled)')).find(Boolean);
   const cell = q('#board [data-h], #board [data-v]');
@@ -36,8 +39,11 @@ for (let i = 0; i < 400 && !seenGain; i++) {
   else if (qa('#hand [data-act=step]:not(:disabled)').length) click(q('#hand [data-act=step][data-d="1"]:not(:disabled)'));
   else if (cell) click(cell);
   else if (q('#hand [data-act=end]')) click(q('#hand [data-act=end]'));
-  if (qa('.fx-hex').length || qa('.fx-block').length) {
-    const g = JSON.parse(w.localStorage.getItem('colons-de-lile-v1'));
+  const g = JSON.parse(w.localStorage.getItem('colons-de-lile-v1'));
+  // l'animation survit à la fin du tour : on ne vérifie qu'une fois par lancer, tant que les dés sont là
+  const key = g.dice && g.turnNo + ':' + g.dice;
+  if ((qa('.fx-hex').length || qa('.fx-block').length) && key && key !== checked) {
+    checked = key;
     const E = w.Engine, board = E.boardFromSeed(g.seed);
     const sum = g.dice[0] + g.dice[1];
     const expected = board.hexes.filter((h) => h.number === sum && h.id !== g.robber).length;

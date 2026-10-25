@@ -43,7 +43,7 @@ Cette séparation est la raison pour laquelle on commence par l'artefact en mode
 1. **Géométrie** : hexagones en coordonnées axiales → sommets/arêtes dédupliqués par position arrondie. Tout le reste en dépend.
 2. **Ports** : 30 arêtes côtières triées par angle, 9 ports espacés 3-3-4.
 3. **Plateau équilibré** : 6 et 8 jamais adjacents (tirage répété).
-4. **Machine à états** (`phase` + `step`) : `setup:settlement → setup:road → main:roll → discard → robber → steal → actions → roadBuilding`.
+4. **Machine à états** (`phase` + `step`) : `order:rollOrder → setup:settlement → setup:road → main:roll → discard → robber → steal → actions → roadBuilding`.
 5. **Règles de pose** : distance de 2, connexion à ses routes, route bloquée par une colonie adverse.
 6. **Plus longue route** : parcours en profondeur, colonies adverses coupent, égalité = le détenteur garde.
 7. **Banque limitée** (19 par ressource) : si la banque ne peut pas servir tout le monde, personne n'est servi (sauf un seul joueur concerné).

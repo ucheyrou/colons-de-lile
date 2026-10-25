@@ -21,7 +21,8 @@ Jeu de base, 3 à 4 joueurs. Premier à **10 points de victoire**, vérifié pen
 | Carte de développement | 1 laine, 1 blé, 1 minerai | — |
 
 ## Mise en place
-Chacun pose colonie puis route, dans l'ordre 1→N, puis N→1. La route touche la colonie qui vient d'être posée. La seconde colonie rapporte une carte par hexagone voisin. Le dernier à poser commence (c'est le joueur 1).
+Chacun lance un dé, dans n'importe quel ordre. Le plus grand dé pose sa colonie en premier ; en cas d'égalité au plus haut, seuls les ex aequo relancent, jusqu'à les départager.
+Chacun pose ensuite colonie puis route, en partant du premier et en suivant l'ordre des sièges, puis en sens inverse (le premier pose donc aussi la dernière colonie). La route touche la colonie qui vient d'être posée. La seconde colonie rapporte une carte par hexagone voisin. Le premier à avoir posé joue le premier tour.
 
 ## Tour de jeu
 1. **Dés.** Avant de les lancer, on peut jouer une carte de développement (un chevalier par exemple).

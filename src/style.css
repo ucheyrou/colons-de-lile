@@ -147,7 +147,9 @@ h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
   background: #fffdf8; color: #1b1b1b; border: 1px solid #1b1b1b33; font: 800 18px var(--f-display);
 }
 .dice .sum { font: 800 20px var(--f-display); min-width: 28px; text-align: center; font-variant-numeric: tabular-nums; }
-.dice.rolled .die { animation: tumble .45s ease-out; }
+.dice.rolled .die, .die.tumble { animation: tumble .45s ease-out; }
+.dice.order .die { border: 3px solid var(--pc); }
+.dice.order .die.out { opacity: .45; }
 @keyframes tumble { 0% { transform: rotate(-80deg) scale(.6); } 60% { transform: rotate(14deg) scale(1.1); } 100% { transform: none; } }
 
 .tgt { fill: var(--accent); fill-opacity: .55; stroke: #fff; stroke-width: 6; pointer-events: none; animation: pulse 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
@@ -157,7 +159,7 @@ h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
 .tgt-h-ring { fill: none; stroke: #fff; stroke-width: 6; stroke-dasharray: 14 10; pointer-events: none; }
 @keyframes pulse { 50% { transform: scale(1.25); fill-opacity: .6; } }
 @keyframes glow { 50% { stroke-opacity: .4; } }
-@media (prefers-reduced-motion: reduce) { .tgt, .tgt-e, .dice.rolled .die { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .tgt, .tgt-e, .dice.rolled .die, .die.tumble { animation: none; } }
 .piece { stroke: #1b1b1b; stroke-width: 2.4; stroke-linejoin: round; }
 
 /* ---------- Joueurs et scores ---------- */
@@ -244,7 +246,7 @@ h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
 
 /* ---------- Journal ---------- */
 .log { padding: 12px; }
-.log ol { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow-y: auto; display: flex; flex-direction: column-reverse; gap: 3px; font-size: 13px; color: var(--muted); }
+.log ol { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--muted); }
 .log li:last-child { color: var(--ink); font-weight: 600; }
 
 /* ---------- Accueil et fin de partie ---------- */

@@ -6,6 +6,7 @@ const pick = (a, rnd) => a[Math.floor(rnd() * a.length)];
 export function botStep(s, rnd) {
   const out = [];
   const go = (a) => out.push(a);
+  if (s.phase === 'order') return E.actors(s).map((pid) => ({ type: 'rollOrder', player: pid }));
   if (s.phase === 'main' && s.step === 'discard') {
     return E.actors(s).map((pid) => {
       const av = E.available(s, pid);

@@ -16,8 +16,14 @@ const refused = (s, a) => {
   return r.error;
 };
 
+// Fait lancer le dé de départ à chacun jusqu'à ce que l'ordre soit décidé.
+function decideOrder(s) {
+  while (s.phase === 'order') s = ok(s, { type: 'rollOrder', player: E.actors(s)[0] });
+  return s;
+}
 // Passe la mise en place en posant au premier emplacement légal.
 function finishSetup(s) {
+  s = decideOrder(s);
   while (s.phase === 'setup') {
     const av = E.available(s, s.turn);
     s = av.setupSettlement
@@ -93,22 +99,62 @@ test('déterminisme : même graine, même plateau et mêmes dés', () => {
 test('apply ne modifie pas son entrée', () => {
   const s = fresh();
   const before = JSON.stringify({ ...s, board: null });
-  E.apply(s, { type: 'placeSettlement', player: 0, vertex: 0 });
+  E.apply(s, { type: 'rollOrder', player: 0 });
+  E.apply(decideOrder(s), { type: 'placeSettlement', player: decideOrder(s).turn, vertex: 0 });
   assert.equal(JSON.stringify({ ...s, board: null }), before);
 });
 
-test('mise en place : serpentin, distance, 2e colonie rapporte', () => {
+test('tirage de départ : un dé chacun, une seule fois, rien d\'autre avant', () => {
   let s = fresh();
-  assert.deepEqual(s.setup.order, [0, 1, 2, 2, 1, 0]);
-  refused(s, { type: 'placeSettlement', player: 1, vertex: 0 });
-  s = ok(s, { type: 'placeSettlement', player: 0, vertex: 0 });
-  refused(s, { type: 'placeSettlement', player: 0, vertex: s.board.vertices[0].nbrs[0] });
+  assert.equal(s.phase, 'order');
+  assert.deepEqual(E.actors(s), [0, 1, 2]);
+  assert.ok([0, 1, 2].every((p) => E.available(s, p).rollOrder));
+  refused(s, { type: 'placeSettlement', player: 0, vertex: 0 });
+  refused(s, { type: 'roll', player: 0 });
+  s = ok(s, { type: 'rollOrder', player: 1 });
+  assert.equal(s.order.rolls[1].length, 1);
+  assert.match(refused(s, { type: 'rollOrder', player: 1 }), /déjà/);
+  assert.deepEqual(E.actors(s), [0, 2]);
+  assert.equal(E.available(s, 1).rollOrder, false);
+});
+
+test('tirage de départ : le plus grand dé pose en premier, les ex aequo relancent', () => {
+  let ties = 0;
+  for (let seed = 1; seed <= 80; seed++) {
+    const s = decideOrder(fresh(seed));
+    const first = s.turn;
+    const rolls = s.order.rolls;
+    const rounds = Math.max(...rolls.map((r) => r.length));
+    assert.equal(rolls[first].length, rounds, 'le gagnant a joué chaque manche, seed ' + seed);
+    for (let k = 0; k < rounds; k++) {
+      const inRound = rolls.map((r, p) => (r.length > k ? p : -1)).filter((p) => p >= 0);
+      const best = Math.max(...inRound.map((p) => rolls[p][k]));
+      assert.equal(rolls[first][k], best, 'le gagnant a le plus grand dé, seed ' + seed);
+      const top = inRound.filter((p) => rolls[p][k] === best);
+      const next = rolls.map((r, p) => (r.length > k + 1 ? p : -1)).filter((p) => p >= 0);
+      if (k < rounds - 1) assert.deepEqual(next, top, 'seuls les ex aequo relancent, seed ' + seed);
+      else assert.equal(top.length, 1);
+    }
+    if (rounds > 1) ties++;
+    assert.deepEqual(s.setup.order, [0, 1, 2, 2, 1, 0].map((i) => (i + first) % 3));
+    assert.equal(s.phase, 'setup');
+    assert.ok(E.available(s, first).setupSettlement);
+  }
+  assert.ok(ties > 0, 'au moins une égalité sur 80 graines');
+});
+
+test('mise en place : serpentin, distance, 2e colonie rapporte', () => {
+  let s = decideOrder(fresh());
+  const first = s.turn, next = (first + 1) % 3;
+  refused(s, { type: 'placeSettlement', player: next, vertex: 0 });
+  s = ok(s, { type: 'placeSettlement', player: first, vertex: 0 });
+  refused(s, { type: 'placeSettlement', player: first, vertex: s.board.vertices[0].nbrs[0] });
   const road = s.board.vertices[0].edges[0];
-  s = ok(s, { type: 'placeRoad', player: 0, edge: road });
-  assert.equal(s.turn, 1);
+  s = ok(s, { type: 'placeRoad', player: first, edge: road });
+  assert.equal(s.turn, next);
   s = finishSetup(s);
   assert.equal(s.phase, 'main');
-  assert.equal(s.turn, 0);
+  assert.equal(s.turn, first);
   assert.equal(s.step, 'roll');
   const second = s.players.map((p) => E.total(p.hand));
   second.forEach((n) => assert.ok(n <= 3));
@@ -116,10 +162,11 @@ test('mise en place : serpentin, distance, 2e colonie rapporte', () => {
 });
 
 test('la route de départ doit toucher la colonie', () => {
-  let s = fresh();
-  s = ok(s, { type: 'placeSettlement', player: 0, vertex: 0 });
+  let s = decideOrder(fresh());
+  const first = s.turn;
+  s = ok(s, { type: 'placeSettlement', player: first, vertex: 0 });
   const far = s.board.edges.find((e) => e.a !== 0 && e.b !== 0).id;
-  refused(s, { type: 'placeRoad', player: 0, edge: far });
+  refused(s, { type: 'placeRoad', player: first, edge: far });
 });
 
 test('production : colonie 1, ville 2, voleur bloque', () => {

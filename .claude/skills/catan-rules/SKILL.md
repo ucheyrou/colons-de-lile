@@ -10,12 +10,13 @@ description: Règles de référence du jeu « Colons de l'Île » (jeu de base i
 3. Pour un cas limite, écris d'abord le test dans `test/engine.test.mjs`, puis corrige `src/engine.js`.
 
 ## Machine à états (`state.phase` / `state.step`)
-- `setup`: `settlement` → `road`, en serpentin (`state.setup.order`).
+- `order`: `rollOrder` (un dé chacun, `state.order.pending` ; les ex aequo au plus haut relancent, `state.order.contenders`).
+- `setup`: `settlement` → `road`, en serpentin depuis le plus grand dé (`state.setup.order`).
 - `main`: `roll` → (`discard`) → (`robber` → `steal`) → `actions` ; `roadBuilding` pendant la carte du même nom.
 - `ended`: `state.winner` renseigné.
 
 ## Actions (champ `player` obligatoire)
-`roll`, `discard{cards}`, `moveRobber{hex}`, `steal{victim}`, `placeSettlement{vertex}`, `placeCity{vertex}`, `placeRoad{edge}`, `buyDev`, `playKnight`, `playRoadBuilding`, `playYearOfPlenty{a,b}`, `playMonopoly{res}`, `bankTrade{give,get}`, `offerTrade{give,want}`, `respondTrade{accept}`, `confirmTrade{with}`, `cancelTrade`, `endTurn`.
+`rollOrder`, `roll`, `discard{cards}`, `moveRobber{hex}`, `steal{victim}`, `placeSettlement{vertex}`, `placeCity{vertex}`, `placeRoad{edge}`, `buyDev`, `playKnight`, `playRoadBuilding`, `playYearOfPlenty{a,b}`, `playMonopoly{res}`, `bankTrade{give,get}`, `offerTrade{give,want}`, `respondTrade{accept}`, `confirmTrade{with}`, `cancelTrade`, `endTurn`.
 
 ## Cas limites à toujours tester
 - 7 avec plusieurs joueurs à défausser, puis vol sans victime possible.

@@ -42,7 +42,7 @@
   const ui = {
     screen: 'menu', pin: null, mode: null, tradeOpen: false, tab: 'bank', bankGive: null, bankGet: null,
     give: zero(), want: zero(), discard: zero(), pick: null, yop: [], toast: '', confirmNew: false,
-    count: 3, names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: '', lastTurn: -1, fxKey: null, fx: null, fxNow: null, fxTimer: 0, gain: null, gainTimer: 0, lastHand: null,
+    count: 3, names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: '', orderSeen: null, lastTurn: -1, fxKey: null, fx: null, fxNow: null, fxTimer: 0, gain: null, gainTimer: 0, lastHand: null,
     code: '', joinCode: '', myName: '', error: '', busy: false,
     seat: -1, boardSeed: null, board: null, conn: 'searching', lobby: [], pending: 0, phoneTab: 'hand', needBoard: false, wasNeed: false, wasMine: false,
   };
@@ -222,7 +222,7 @@
     return out.join('');
   }
 
-  function resetFx() { ui.fxKey = null; ui.fx = null; ui.fxNow = null; ui.gain = null; ui.lastHand = null; }
+  function resetFx() { ui.fxKey = null; ui.fx = null; ui.fxNow = null; ui.gain = null; ui.lastHand = null; ui.orderSeen = null; }
 
   // ---------- Animation du lancer : les tuiles qui produisent passent au premier plan ----------
   const FX_MS = 4200;
@@ -269,12 +269,13 @@
     if (mode === 'client') {
       txt = hintText(s, ui.seat, E.available(s, ui.seat)).t;
     } else if (s.phase === 'ended') txt = who.name + ' a gagné';
+    else if (s.phase === 'order') txt = 'Qui commence ? Chacun lance un dé';
     else if (s.phase === 'setup') txt = who.name + ' · ' + (s.step === 'settlement' ? 'pose une colonie' : 'pose une route');
     else {
       const map = { roll: 'lance les dés', discard: 'attend les défausses', robber: 'déplace le voleur', steal: 'choisit qui voler', actions: 'joue son tour', roadBuilding: 'pose ses routes' };
       txt = who.name + ' · ' + (map[s.step] || '');
     }
-    let dice = '';
+    let dice = s.phase === 'order' ? orderDiceHTML(s) : '';
     if (s.dice) {
       const key = s.turnNo + ':' + s.dice.join(',');
       const fresh = key !== ui.diceKey;
@@ -287,9 +288,24 @@
         ? 'Produisent : ' + ui.fxNow.terrains.map((tr) => icon(GLYPH[tr], 'mini')).join('')
         : 'Aucune tuile ne produit') + (ui.fxNow.blocked.length ? ' <b>· bloquée par le voleur</b>' : '') + '</div>';
     }
+    const dot = s.phase === 'order' ? '' : '<span class="dot" style="--pc:' + pcolor(s.turn) + '"></span>';
     const cancel = mode === 'client' && ui.mode ? '<button class="btn small" data-act="mode" data-k="' + ui.mode + '">Annuler</button>' : '';
-    return '<div class="say"><span class="dot" style="--pc:' + pcolor(s.turn) + '"></span>' + esc(txt) + '</div>' + cancel + dice + cap;
+    return '<div class="say">' + dot + esc(txt) + '</div>' + cancel + dice + cap;
   }
+
+  // Dés du tirage de départ ; seul le dé qui vient d'être lancé roule, les joueurs départagés s'estompent.
+  function orderDiceHTML(s) {
+    const prev = ui.orderSeen || [];
+    const counts = s.order.rolls.map((r) => r.length);
+    ui.orderSeen = counts;
+    const dice = s.players.filter((p) => counts[p.id]).map((p) => {
+      const cls = 'die' + (counts[p.id] !== prev[p.id] ? ' tumble' : '') + (s.order.contenders.includes(p.id) ? '' : ' out');
+      return '<span class="' + cls + '" style="--pc:' + pcolor(p.id) + '" title="' + esc(p.name) + '">' + lastRoll(s, p.id) + '</span>';
+    });
+    return dice.length ? '<div class="dice order" aria-label="Dés de départ">' + dice.join('') + '</div>' : '';
+  }
+  const lastRoll = (s, i) => s.order.rolls[i][s.order.rolls[i].length - 1];
+  const rollsText = (s, i) => s.order.rolls[i].join(' puis ');
 
   // ---------- Scores ----------
   function onlineSeats() {
@@ -301,7 +317,8 @@
     const s = game, v = mode === 'host' ? -1 : viewer();
     const on = onlineSeats();
     const rows = s.players.map((p, i) => {
-      const badges = (s.longestRoad.holder === i ? '<span class="badge">Plus longue route</span>' : '') +
+      const badges = (s.phase === 'order' && s.order.rolls[i].length ? '<span class="badge">Dé : ' + rollsText(s, i) + '</span>' : '') +
+        (s.longestRoad.holder === i ? '<span class="badge">Plus longue route</span>' : '') +
         (s.largestArmy.holder === i ? '<span class="badge">Plus grande armée</span>' : '') +
         (mode === 'host' && !on.has(i) ? '<span class="badge off">Hors ligne</span>' : '');
       const tag = mode === 'local' && i === v ? ' <small>(affiché)</small>' : (mode === 'client' && i === v ? ' <small>(toi)</small>' : '');
@@ -309,15 +326,18 @@
         '<span class="dot"></span><b>' + esc(p.name) + tag + '</b><span class="pts" title="Points visibles">' + E.points(s, i, false) + '</span>' +
         '<span class="meta"><span>' + cardsOf(p) + ' cartes</span><span>' + devOf(p) + ' dév.</span><span>' + p.knights + ' chevalier' + (p.knights > 1 ? 's' : '') + '</span><span>route ' + (p.roadLen || 0) + '</span>' + badges + '</span></li>';
     }).join('');
-    const bank = RES.map((r) => '<span title="' + NAME[r] + '">' + icon(r, 'mini') + s.bank[r] + '</span>').join('');
     return '<h2>Joueurs · objectif ' + E.WIN_POINTS + ' points</h2><ul class="players">' + rows + '</ul>' +
-      '<div class="bank"><b>Banque</b>' + bank + '<span>cartes dév. ' + deckOf(s) + '</span></div>';
+      '<div class="bank"><b>Pioche</b><span>' + deckOf(s) + ' cartes de développement</span></div>';
   }
 
   // ---------- Main du joueur ----------
   function hintText(s, v, av) {
     const turnName = s.players[s.turn].name;
     if (s.phase === 'ended') return { t: s.players[s.winner].name + ' remporte la partie.', go: false };
+    if (s.phase === 'order') {
+      if (av.rollOrder) return { t: s.order.rolls[v].length ? 'Égalité : relance ton dé.' : 'Lance le dé : le plus grand pose sa colonie en premier.', go: true };
+      return { t: 'En attente du dé de ' + s.order.pending.map((i) => s.players[i].name).join(', ') + '.', go: false };
+    }
     if (s.phase === 'setup') {
       if (s.turn !== v) return { t: 'Mise en place : au tour de ' + turnName + '.', go: false };
       return av.setupSettlement
@@ -351,7 +371,7 @@
         icon(r) + av.ratios[r] + ' pour 1<small>' + me.hand[r] + ' en main</small></button>').join('') + '</div>';
       html += '<div class="section-title">Je reçois</div><div class="picks">' + RES.map((r) =>
         '<button class="pick" data-act="bank-get" data-r="' + r + '" aria-pressed="' + (ui.bankGet === r) + '"' + (s.bank[r] > 0 && r !== ui.bankGive ? '' : ' disabled') + '>' +
-        icon(r) + NAME[r] + '<small>banque ' + s.bank[r] + '</small></button>').join('') + '</div>';
+        icon(r) + NAME[r] + '</button>').join('') + '</div>';
       html += '<button class="btn primary" data-act="bank-do"' + (ui.bankGive && ui.bankGet ? '' : ' disabled') + '>Échanger avec la banque</button>';
     } else if (t && t.from === v) {
       html += '<div class="offer"><div class="line">Tu proposes ' + bundle(t.give) + ' contre ' + bundle(t.want) + '</div>';
@@ -391,7 +411,7 @@
   function needsMe(s, v) {
     if (!s || s.phase === 'ended' || v < 0) return false;
     const av = E.available(s, v);
-    return !!(av.roll || av.discard || av.setupSettlement || av.setupRoad || av.moveRobber || av.steal || av.freeRoad ||
+    return !!(av.rollOrder || av.roll || av.discard || av.setupSettlement || av.setupRoad || av.moveRobber || av.steal || av.freeRoad ||
       (s.trade && s.trade.from !== v && s.trade.responses[v] === undefined && s.phase === 'main'));
   }
 
@@ -419,7 +439,7 @@
     const av = E.available(s, v);
     const hint = hintText(s, v, av);
     const chips = mode === 'local' ? '<div class="chips" role="group" aria-label="Changer de joueur affiché">' + s.players.map((p, i) => {
-      const alert = (s.step === 'discard' && s.discard[i]) || (s.trade && s.trade.from !== i && s.trade.responses[i] === undefined && s.phase === 'main');
+      const alert = (s.phase === 'order' && s.order.pending.includes(i)) || (s.step === 'discard' && s.discard[i]) || (s.trade && s.trade.from !== i && s.trade.responses[i] === undefined && s.phase === 'main');
       return '<button class="chip" data-act="view" data-i="' + i + '" aria-pressed="' + (i === v) + '"><span class="dot" style="--pc:' + pcolor(i) + '"></span>' + esc(p.name) + (alert ? '<span class="alert" title="Doit agir"></span>' : '') + '</button>';
     }).join('') + '</div>' : '';
     let html = '<div class="hand-head"><span class="dot" style="--pc:' + pcolor(v) + '"></span><h2>' + (mode === 'client' ? esc(me.name) : 'Main de ' + esc(me.name)) + '</h2>' +
@@ -436,6 +456,8 @@
       return '<div class="tile' + (me.hand[r] ? '' : ' zero') + (gained ? ' gain' : '') + '"' + (gained ? ' style="--gd:-' + gElapsed + 'ms"' : '') + '>' + (gained ? '<i class="plus">+' + gained + '</i>' : '') + icon(r) + '<b>' + me.hand[r] + '</b><span>' + NAME[r] + '</span></div>';
     }).join('') + '</div>';
 
+    if (av.rollOrder) html += '<button class="btn primary big" data-act="roll-order">Lancer le dé</button>';
+    if (s.phase === 'order') html += orderListHTML(s);
     if (av.roll) html += '<button class="btn primary big" data-act="roll">Lancer les dés</button>';
     if (av.discard) {
       const n = sum(ui.discard);
@@ -489,6 +511,14 @@
 
     if (ui.toast) html += '<div class="toast" role="alert">' + esc(ui.toast) + '</div>';
     return html;
+  }
+
+  function orderListHTML(s) {
+    return '<div class="section-title">Qui commence ?</div><ul class="players">' + s.players.map((p, i) => {
+      const n = s.order.rolls[i].length;
+      return '<li class="pl" style="--pc:' + pcolor(i) + '"><span class="dot"></span><b>' + esc(p.name) + '</b><span class="pts">' + (n ? lastRoll(s, i) : '…') + '</span>' +
+        (n > 1 ? '<span class="meta">' + rollsText(s, i) + '</span>' : '') + '</li>';
+    }).join('') + '</ul>';
   }
 
   function logHTML() {
@@ -610,6 +640,14 @@
     nav.innerHTML = [['hand', 'Ma main', mine], ['board', 'Plateau', false], ['info', 'Joueurs', false]].map((t) =>
       '<button class="nav-btn" data-act="phone-tab" data-k="' + t[0] + '" aria-pressed="' + (ui.phoneTab === t[0]) + '">' + t[1] + (t[2] ? '<span class="alert"></span>' : '') + '</button>').join('');
   }
+  // Le journal suit les dernières lignes, sauf si on est remonté le lire.
+  function renderLog() {
+    const prev = $('log').querySelector('ol');
+    const keep = prev && prev.scrollHeight - prev.scrollTop - prev.clientHeight > 24 ? prev.scrollTop : null;
+    $('log').innerHTML = logHTML();
+    const ol = $('log').querySelector('ol');
+    ol.scrollTop = keep === null ? ol.scrollHeight : keep;
+  }
   function render() {
     renderTop();
     $('welcome').hidden = !!game;
@@ -640,7 +678,7 @@
       renderHand();
     }
     $('scores').innerHTML = scoresHTML();
-    $('log').innerHTML = logHTML();
+    renderLog();
     const over = $('over');
     over.innerHTML = overHTML();
     over.hidden = game.phase !== 'ended';
@@ -822,6 +860,7 @@
     },
     'phone-tab': (t) => { ui.phoneTab = t.dataset.k; render(); },
     view: (t) => { ui.pin = +t.dataset.i; ui.mode = null; render(); },
+    'roll-order': () => dispatch({ type: 'rollOrder', player: viewer() }),
     roll: () => dispatch({ type: 'roll', player: viewer() }),
     end: () => dispatch({ type: 'endTurn', player: viewer() }),
     buy: () => dispatch({ type: 'buyDev', player: viewer() }),

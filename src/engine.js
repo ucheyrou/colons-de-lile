@@ -214,13 +214,10 @@
     s.buildings = {};
     s.roads = {};
     s.robber = s.board.hexes.find((h) => h.terrain === 'desert').id;
-    const n = names.length;
-    const order = [];
-    for (let i = 0; i < n; i++) order.push(i);
-    for (let i = n - 1; i >= 0; i--) order.push(i);
-    s.setup = { idx: 0, order, last: null };
-    s.phase = 'setup';
-    s.step = 'settlement';
+    s.order = { contenders: names.map((_, i) => i), pending: names.map((_, i) => i), rolls: names.map(() => []) };
+    s.setup = { idx: 0, order: [], last: null };
+    s.phase = 'order';
+    s.step = 'rollOrder';
     s.turn = 0;
     s.turnNo = 0;
     s.dice = null;
@@ -234,7 +231,7 @@
     s.largestArmy = { holder: null, size: 0 };
     s.winner = null;
     s.log = [];
-    log(s, 'La partie commence. ' + nameOf(s, 0) + ' pose sa première colonie.');
+    log(s, 'La partie commence. Chacun lance un dé : le plus grand pose sa colonie en premier.');
     return s;
   }
 
@@ -410,6 +407,7 @@
 
   function turnOnly(s, a) {
     need(s.phase !== 'ended', 'La partie est terminée.');
+    need(s.phase !== 'order', 'Lance d\'abord le dé pour savoir qui commence.');
     need(a.player === s.turn, 'Ce n\'est pas ton tour.');
   }
   function mainActions(s, a) {
@@ -417,6 +415,38 @@
     need(s.phase === 'main' && s.step === 'actions', 'Tu ne peux pas faire ça maintenant.');
   }
   function clearTrade(s) { s.trade = null; }
+
+  // Tirage de l'ordre : un dé chacun, les ex aequo au plus haut relancent entre eux.
+  handlers.rollOrder = (s, a) => {
+    need(s.phase === 'order', 'L\'ordre de jeu est déjà décidé.');
+    need(s.order.pending.includes(a.player), 'Tu as déjà lancé ton dé.');
+    const d = rint(s, 6) + 1;
+    s.order.rolls[a.player].push(d);
+    s.order.pending = s.order.pending.filter((p) => p !== a.player);
+    log(s, nameOf(s, a.player) + ' lance le dé : ' + d + '.');
+    if (!s.order.pending.length) settleOrder(s);
+  };
+
+  function settleOrder(s) {
+    const o = s.order;
+    const last = (p) => o.rolls[p][o.rolls[p].length - 1];
+    const best = Math.max(...o.contenders.map(last));
+    const top = o.contenders.filter((p) => last(p) === best);
+    if (top.length > 1) {
+      o.contenders = top;
+      o.pending = top.slice();
+      log(s, 'Égalité à ' + best + ' : ' + top.map((p) => nameOf(s, p)).join(' et ') + ' relancent.');
+      return;
+    }
+    // Le premier pose, puis on tourne dans l'ordre des sièges, puis retour en sens inverse.
+    const n = s.players.length;
+    const ring = Array.from({ length: n }, (_, i) => (top[0] + i) % n);
+    s.setup.order = ring.concat(ring.slice().reverse());
+    s.phase = 'setup';
+    s.step = 'settlement';
+    s.turn = top[0];
+    log(s, nameOf(s, top[0]) + ' a le plus grand dé (' + best + ') et pose sa colonie en premier.');
+  }
 
   handlers.placeSettlement = (s, a) => {
     turnOnly(s, a);
@@ -730,13 +760,14 @@
   // ---------- Ce que l'interface a le droit de proposer ----------
   function available(s, pid) {
     const p = s.players[pid];
-    const mine = s.phase !== 'ended' && s.turn === pid;
+    const mine = (s.phase === 'setup' || s.phase === 'main') && s.turn === pid;
     const main = s.phase === 'main';
     const acts = mine && main && s.step === 'actions';
     const canDevNow = mine && main && (s.step === 'roll' || s.step === 'actions') && !s.devPlayed;
     const afford = (c) => has(p.hand, c);
     const out = {
       myTurn: mine,
+      rollOrder: s.phase === 'order' && s.order.pending.includes(pid),
       roll: mine && main && s.step === 'roll',
       endTurn: acts,
       discard: s.phase === 'main' && s.step === 'discard' ? s.discard[pid] || 0 : 0,
@@ -779,6 +810,7 @@
   // Qui doit agir maintenant (utile à l'interface et au réseau).
   function actors(s) {
     if (s.phase === 'ended') return [];
+    if (s.phase === 'order') return s.order.pending.slice();
     if (s.phase === 'main' && s.step === 'discard') return Object.keys(s.discard).map(Number);
     return [s.turn];
   }
