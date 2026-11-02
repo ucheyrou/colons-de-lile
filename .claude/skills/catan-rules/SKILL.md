@@ -17,7 +17,13 @@ description: Règles de référence du jeu « Au temps béni des colonies » (je
 - `ended`: `state.winner` renseigné.
 
 ## Actions (champ `player` obligatoire)
-`pickColor{color}`, `rollOrder`, `roll`, `discard{cards}`, `moveRobber{hex}`, `steal{victim}`, `placeSettlement{vertex}`, `placeCity{vertex}`, `placeRoad{edge}`, `buyDev`, `playKnight`, `playRoadBuilding`, `playYearOfPlenty{a,b}`, `playMonopoly{res}`, `bankTrade{give,get}`, `offerTrade{give,want}`, `respondTrade{accept}`, `confirmTrade{with}`, `cancelTrade`, `endTurn`.
+`pickColor{color}`, `rollOrder`, `roll`, `discard{cards}`, `moveRobber{hex}`, `steal{victim}`, `placeSettlement{vertex}`, `placeCity{vertex}`, `placeRoad{edge}`, `placeShip{edge}` (Archipel), `buyDev`, `playKnight`, `playRoadBuilding`, `playYearOfPlenty{a,b}`, `playMonopoly{res}`, `bankTrade{give,get}`, `offerTrade{give,want}`, `respondTrade{accept}`, `confirmTrade{with}`, `cancelTrade`, `endTurn`.
+
+## Variante Archipel (`state.variant === 'sea'`)
+- `newGame({names, seed, variant})`, `boardFromSeed(seed, variant)` ; `state.ships` (arête → joueur), `state.discover` (îlot → joueur).
+- Plateau : `hex.island` (0 = île principale, 1 à 3 = îlots, `null` = mer), `edge.land` / `edge.sea`, `vertex.land` / `vertex.island`.
+- `available` : `ship`, `freeShip` ; `targets.edgeKind` (`road` ou `ship`) dit quelle pièce poser sur les arêtes surlignées. `goalOf(s)` donne l'objectif (10 ou 12).
+- Tests : `test/sea.test.mjs`, `node test/simulate.mjs 200 sea`, `node test/e2e.mjs --sea`.
 
 ## Cas limites à toujours tester
 - 7 avec plusieurs joueurs à défausser, puis vol sans victime possible.

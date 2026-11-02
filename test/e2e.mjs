@@ -1,5 +1,5 @@
 // Test de bout en bout : un écran hôte + 3 téléphones (fenêtres jsdom) reliés par un faux salon, chiffrement réel.
-// Option --site : pas de capacité `room`, vrai courtier MQTT public (réseau requis).
+// Option --site : pas de capacité `room`, vrai courtier MQTT public (réseau requis). Option --sea : plateau Archipel.
 // Nécessite jsdom (npm i --no-save jsdom) et dist/index.html (node build.mjs). Lancer : node test/e2e.mjs
 import { JSDOM, VirtualConsole } from 'jsdom';
 import { readFileSync } from 'node:fs';
@@ -9,6 +9,7 @@ import { Hub } from './fake-room.mjs';
 const html = readFileSync(fileURLToPath(new URL('../dist/index.html', import.meta.url)), 'utf8').replace(/<script src="[^"]*"><\/script>/g, '');
 const errors = [];
 const site = process.argv.includes('--site');
+const atSea = process.argv.includes('--sea');
 const hub = new Hub();
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, ms = 5000, what = '') {
@@ -57,11 +58,13 @@ console.log('salon hôte :', host.qa('#welcome .pl b').map((e) => e.textContent)
 await until(() => phones.every((p) => /Tu es dans la salle/.test(p.d.getElementById('welcome').textContent)), 5000, 'attente côté téléphone');
 console.log('téléphones en attente : ok');
 
+if (atSea) host.click(host.q('[data-act=variant][data-k=sea]'));
 const tStart = Date.now();
 host.click(host.q('[data-act=host-start]'));
 await until(() => !host.q('#game').hidden, 3000, 'hôte lance');
 try { await until(() => phones.every((p) => !p.q('#game').hidden && p.q('.layout.client')), 20000, 'vues téléphone'); } catch (e) { console.log('ÉTAT', phones.map((p) => p.d.getElementById('welcome').textContent.slice(0, 120) + ' | game hidden=' + p.q('#game').hidden).join('\n')); console.log(errors); throw e; }
 console.log('vues reçues par les 3 téléphones en', Date.now() - tStart, 'ms');
+if (atSea && phones.some((p) => p.qa('#board .sea-hex').length !== 15)) throw new Error('les téléphones devraient dessiner l\'archipel');
 console.log('partie lancée. joueurs hôte :', host.qa('#scores .pl b').map((e) => e.textContent).join(', '));
 console.log('main cachée sur l\'écran hôte :', host.q('.layout').classList.contains('host'));
 
@@ -98,8 +101,9 @@ if (saved) console.log('hôte : phase', saved.game.phase, '| tour', saved.game.t
 // Cohérence : les téléphones affichent les mêmes bâtiments que l'hôte
 const count = (x, sel) => x.qa(sel).length;
 console.log('pièces plateau hôte/tél :', count(host, '#board .piece'), phones.map((p) => count(p, '#board .piece')).join('/'));
+if (atSea) console.log('bateaux hôte/tél :', count(host, '#board .ship'), phones.map((p) => count(p, '#board .ship')).join('/'), '| îlots découverts', Object.keys(saved.game.discover).length);
 console.log('mains tél :', phones.map(tiles).join(' | '));
 const leak = phones.some((p) => p.qa('#hand .tile').length !== 5);
 console.log('chaque téléphone affiche une seule main (5 tuiles) :', !leak);
 console.log('erreurs :', errors.length); errors.slice(0, 4).forEach((e) => console.log(e));
-process.exit(errors.length || leak || count(host, '#board .piece') !== count(phones[0], '#board .piece') ? 1 : 0);
+process.exit(errors.length || leak || count(host, '#board .piece') !== count(phones[0], '#board .piece') || count(host, '#board .ship') !== count(phones[0], '#board .ship') ? 1 : 0);

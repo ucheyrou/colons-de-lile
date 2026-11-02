@@ -209,6 +209,10 @@ h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
 @keyframes glow { 50% { stroke-opacity: .4; } }
 @media (prefers-reduced-motion: reduce) { .tgt, .tgt-e, .cube-box .cube, .cube-box .cube-shadow, .dice .sum { animation: none !important; } }
 .piece { stroke: #1b1b1b; stroke-width: 3; stroke-linejoin: round; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .4)); }
+/* Variante Archipel : cases de mer, bateaux, arêtes marines surlignées en tirets. */
+.sea-hex { fill: url(#waves); stroke: var(--sea-edge); stroke-width: 3; stroke-linejoin: round; }
+.ship { stroke: #1b1b1b; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .35)); }
+.tgt-e.ship { stroke-dasharray: 2 34; stroke-width: 22; }
 
 /* ---------- Joueurs et scores ---------- */
 .scores { padding: 12px; }
@@ -261,6 +265,7 @@ h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
 .dev .nm small { display: block; color: var(--muted); font-weight: 500; font-size: 12px; }
 .dev .cnt { font: 800 16px var(--f-display); min-width: 22px; text-align: center; }
 .builds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.builds.five > :last-child { grid-column: 1 / -1; }
 .build { text-align: left; flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 12px; min-height: 56px; }
 .build .cost { display: flex; gap: 1px; flex-wrap: wrap; min-height: 16px; }
 .build[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
@@ -462,6 +467,16 @@ h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
 .mode-card b { font: 800 18px var(--f-display); }
 .mode-card span { color: var(--muted); font-size: 14px; }
 .mode-card:hover { border-color: var(--accent); background: var(--surface); }
+.variants { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.variant {
+  display: grid; gap: 4px; align-content: start; text-align: left; min-height: 44px; padding: 12px 14px; border-radius: 12px;
+  border: 2px solid var(--line); background: var(--surface-2); color: var(--ink); font: inherit; cursor: pointer;
+}
+.variant b { font: 800 17px var(--f-display); }
+.variant span { color: var(--muted); font-size: 13px; }
+.variant[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.variant:hover { border-color: var(--accent); }
+@media (max-width: 420px) { .variants { grid-template-columns: 1fr; } }
 .mode-card.resume { border-color: var(--accent); background: var(--accent-soft); }
 .back { justify-self: start; }
 .field { display: grid; gap: 6px; }
@@ -788,7 +803,7 @@ body.is-client .top { margin-bottom: 8px; }
 
   const RES = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
   const RES_FR = { wood: 'bois', brick: 'argile', sheep: 'laine', wheat: 'blé', ore: 'minerai' };
-  const TERRAIN_RES = { forest: 'wood', hills: 'brick', pasture: 'sheep', fields: 'wheat', mountains: 'ore', desert: null };
+  const TERRAIN_RES = { forest: 'wood', hills: 'brick', pasture: 'sheep', fields: 'wheat', mountains: 'ore', desert: null, sea: null };
   const COLORS = ['red', 'blue', 'orange', 'white', 'green', 'purple'];
   const COLOR_FR = { red: 'rouge', blue: 'bleu', orange: 'orange', white: 'blanc', green: 'vert', purple: 'violet' };
   const COST = {
@@ -796,10 +811,15 @@ body.is-client .top { margin-bottom: 8px; }
     settlement: { wood: 1, brick: 1, sheep: 1, wheat: 1 },
     city: { wheat: 2, ore: 3 },
     dev: { sheep: 1, wheat: 1, ore: 1 },
+    ship: { wood: 1, sheep: 1 },
   };
-  const LIMITS = { road: 15, settlement: 5, city: 4 };
+  const LIMITS = { road: 15, settlement: 5, city: 4, ship: 15 };
   const DEV_FR = { knight: 'Chevalier', vp: 'Point de victoire', roadBuilding: 'Construction de routes', yearOfPlenty: 'Invention', monopoly: 'Monopole' };
   const WIN_POINTS = 10;
+  // Variante « Archipel » : bateaux, îlots au large, 2 points au premier colon de chaque îlot, victoire à 12.
+  const VARIANTS = ['classic', 'sea'];
+  const SEA_WIN_POINTS = 12;
+  const DISCOVERY_POINTS = 2;
 
   class RuleError extends Error {}
   const need = (cond, msg) => { if (!cond) throw new RuleError(msg); };
@@ -878,21 +898,28 @@ body.is-client .top { margin-bottom: 8px; }
     return outer.concat(inner, [[0, 0]]);
   }
 
-  function buildBoard(s) {
+  const hexDist = (q, r) => Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
+  function makeHexes(radius) {
     const coords = [];
-    for (let q = -2; q <= 2; q++) for (let r = -2; r <= 2; r++) if (Math.abs(q + r) <= 2) coords.push([q, r]);
-
-    const hexes = coords.map(([q, r], id) => ({
+    for (let q = -radius; q <= radius; q++) for (let r = -radius; r <= radius; r++) if (Math.abs(q + r) <= radius) coords.push([q, r]);
+    return coords.map(([q, r], id) => ({
       id, q, r,
       x: Math.sqrt(3) * (q + r / 2),
       y: 1.5 * r,
       terrain: null,
       number: null,
+      island: 0,
       vertices: [],
     }));
-    const hexAt = (q, r) => hexes.find((h) => h.q === q && h.r === r);
-    const hexNbrs = (h) => HEX_DIRS.map(([dq, dr]) => hexAt(h.q + dq, h.r + dr)).filter(Boolean);
-    const hot = (h) => h.number === 6 || h.number === 8;
+  }
+  const hexFinder = (hexes) => (q, r) => hexes.find((h) => h.q === q && h.r === r);
+  const nbrsIn = (hexAt) => (h) => HEX_DIRS.map(([dq, dr]) => hexAt(h.q + dq, h.r + dr)).filter(Boolean);
+  const hot = (h) => h.number === 6 || h.number === 8;
+
+  function buildBoard(s) {
+    const hexes = makeHexes(2);
+    const hexAt = hexFinder(hexes);
+    const hexNbrs = nbrsIn(hexAt);
 
     // Comme le vrai jeu : tuiles mélangées, puis jetons A à R posés en spirale
     // depuis un coin de la côte, vers l'intérieur, en sautant le désert.
@@ -911,7 +938,36 @@ body.is-client .top { margin-bottom: 8px; }
       if (!hexes.some((h) => hot(h) && hexNbrs(h).some((n) => hot(n)))) break;
     }
 
-    // Sommets et arêtes dédupliqués par position.
+    const { vertices, edges } = linkHexes(hexes);
+
+    // Ports : 9 sur les 30 arêtes côtières, espacés 3-3-4.
+    const coast = edges
+      .filter((e) => e.hexes.length === 1)
+      .map((e) => {
+        const A = vertices[e.a], B = vertices[e.b];
+        const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
+        return { e, mx, my, ang: Math.atan2(my, mx) };
+      })
+      .sort((p, q) => p.ang - q.ang);
+    const types = shuffle(s, ['any', 'any', 'any', 'any', 'wood', 'brick', 'sheep', 'wheat', 'ore']);
+    const gaps = [0, 3, 6, 10, 13, 16, 20, 23, 26];
+    const ports = gaps.map((g, i) => makePort(hexes, vertices, coast[g % coast.length], types[i]));
+
+    return { hexes, vertices, edges, ports, spiral };
+  }
+
+  function makePort(hexes, vertices, c, type) {
+    const h = hexes[c.e.hexes.find((id) => hexes[id].terrain !== 'sea')];
+    const dx = c.mx - h.x, dy = c.my - h.y;
+    const len = Math.hypot(dx, dy);
+    vertices[c.e.a].port = type;
+    vertices[c.e.b].port = type;
+    return { edge: c.e.id, a: c.e.a, b: c.e.b, type, x: c.mx, y: c.my, nx: dx / len, ny: dy / len };
+  }
+
+  // Sommets et arêtes dédupliqués par position. Une arête « terre » touche une case de terre (route possible),
+  // une arête « mer » touche la mer ou le bord du plateau (bateau possible) ; la côte est les deux.
+  function linkHexes(hexes) {
     const vertices = [];
     const vIndex = new Map();
     const edges = [];
@@ -942,16 +998,69 @@ body.is-client .top { margin-bottom: 8px; }
         edges[eIndex.get(key)].hexes.push(h.id);
       }
     });
+    const isSea = (id) => hexes[id].terrain === 'sea';
     edges.forEach((e) => {
       vertices[e.a].edges.push(e.id);
       vertices[e.b].edges.push(e.id);
       vertices[e.a].nbrs.push(e.b);
       vertices[e.b].nbrs.push(e.a);
+      e.land = e.hexes.some((id) => !isSea(id));
+      e.sea = e.hexes.length === 1 || e.hexes.some(isSea);
+    });
+    vertices.forEach((v) => {
+      const land = v.hexes.find((id) => !isSea(id));
+      v.land = land !== undefined;
+      v.island = v.land ? hexes[land].island : null;
+    });
+    return { vertices, edges };
+  }
+
+  // ---------- Plateau « Archipel » ----------
+  // Hexagone de rayon 3. Trois îlots de deux cases sur trois coins alternés, séparés de l'île principale
+  // par la mer ; l'île principale occupe le reste du centre et pousse une presqu'île vers les trois autres coins.
+  // Rotation et symétrie tirées au hasard, puis terrains et jetons mélangés.
+  const SEA_TERRAINS = [
+    ...repeat('forest', 5), ...repeat('pasture', 5), ...repeat('fields', 4), ...repeat('hills', 3), ...repeat('mountains', 4),
+  ];
+  const SEA_TOKENS = [2, 3, 3, 4, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 9, 10, 10, 10, 11, 11, 12];
+
+  function buildSeaBoard(s) {
+    const hexes = makeHexes(3);
+    const hexAt = hexFinder(hexes);
+    const hexNbrs = nbrsIn(hexAt);
+    const rot = rint(s, 6), turn = rint(s, 2) ? 2 : 4;
+    hexes.forEach((h) => { h.island = null; });
+    [0, 2, 4].forEach((k, n) => {
+      const d = HEX_DIRS[(rot + k) % 6], side = HEX_DIRS[(rot + k + turn) % 6];
+      hexAt(3 * d[0], 3 * d[1]).island = n + 1;
+      hexAt(3 * d[0] + side[0], 3 * d[1] + side[1]).island = n + 1;
+    });
+    const nearIslet = (h) => hexNbrs(h).some((o) => o.island > 0);
+    hexes.forEach((h) => {
+      if (h.island !== null || nearIslet(h)) return;
+      const ring = hexDist(h.q, h.r);
+      const peninsula = ring === 3 && h.q * h.r * (h.q + h.r) === 0;
+      if (ring <= 2 || peninsula) h.island = 0;
     });
 
-    // Ports : 9 sur les 30 arêtes côtières, espacés 3-3-4.
+    const land = hexes.filter((h) => h.island !== null);
+    hexes.forEach((h) => { if (h.island === null) h.terrain = 'sea'; });
+    const main = land.filter((h) => h.island === 0);
+    const desert = main[rint(s, main.length)];
+    desert.terrain = 'desert';
+    const fertile = land.filter((h) => h !== desert);
+    for (let tries = 0; tries < 200; tries++) {
+      const terrains = shuffle(s, SEA_TERRAINS.slice());
+      const tokens = shuffle(s, SEA_TOKENS.slice());
+      fertile.forEach((h, i) => { h.terrain = terrains[i]; h.number = tokens[i]; });
+      if (!fertile.some((h) => hot(h) && hexNbrs(h).some((n) => hot(n)))) break;
+    }
+
+    const { vertices, edges } = linkHexes(hexes);
+
+    // Ports : 9 sur la côte de l'île principale, répartis autour du centre, jamais deux sur un même sommet.
     const coast = edges
-      .filter((e) => e.hexes.length === 1)
+      .filter((e) => e.land && e.sea && e.hexes.some((id) => hexes[id].island === 0))
       .map((e) => {
         const A = vertices[e.a], B = vertices[e.b];
         const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
@@ -959,23 +1068,24 @@ body.is-client .top { margin-bottom: 8px; }
       })
       .sort((p, q) => p.ang - q.ang);
     const types = shuffle(s, ['any', 'any', 'any', 'any', 'wood', 'brick', 'sheep', 'wheat', 'ore']);
-    const gaps = [0, 3, 6, 10, 13, 16, 20, 23, 26];
-    const ports = gaps.map((g, i) => {
-      const c = coast[g % coast.length];
-      const h = hexes[c.e.hexes[0]];
-      const dx = c.mx - h.x, dy = c.my - h.y;
-      const len = Math.hypot(dx, dy);
-      vertices[c.e.a].port = types[i];
-      vertices[c.e.b].port = types[i];
-      return { edge: c.e.id, a: c.e.a, b: c.e.b, type: types[i], x: c.mx, y: c.my, nx: dx / len, ny: dy / len };
+    const start = rint(s, coast.length);
+    const taken = new Set();
+    const ports = types.map((type, i) => {
+      let k = Math.floor(start + (i * coast.length) / types.length);
+      while (taken.has(coast[k % coast.length].e.a) || taken.has(coast[k % coast.length].e.b)) k++;
+      const c = coast[k % coast.length];
+      taken.add(c.e.a);
+      taken.add(c.e.b);
+      return makePort(hexes, vertices, c, type);
     });
 
-    return { hexes, vertices, edges, ports, spiral };
+    return { hexes, vertices, edges, ports, spiral: [] };
   }
 
-  // Le plateau ne dépend que de la graine : un téléphone le reconstruit sans le recevoir.
-  function boardFromSeed(seed) {
-    return buildBoard({ rng: seed | 0 });
+  // Le plateau ne dépend que de la graine (et de la variante) : un téléphone le reconstruit sans le recevoir.
+  function boardFromSeed(seed, variant) {
+    const s = { rng: seed | 0 };
+    return variant === 'sea' ? buildSeaBoard(s) : buildBoard(s);
   }
 
   // ---------- Création de partie ----------
@@ -983,8 +1093,10 @@ body.is-client .top { margin-bottom: 8px; }
     const names = opts.names;
     need(names.length >= 2 && names.length <= 4, 'Entre 2 et 4 joueurs.');
     const seed = (opts.seed == null ? 1 : opts.seed) | 0;
-    const s = { rng: seed, seed };
-    s.board = buildBoard(s);
+    const variant = opts.variant || 'classic';
+    need(VARIANTS.includes(variant), 'Variante inconnue.');
+    const s = { rng: seed, seed, variant };
+    s.board = variant === 'sea' ? buildSeaBoard(s) : buildBoard(s);
     s.players = names.map((name, id) => ({
       id, name, color: null,
       hand: zero(), dev: [], knights: 0,
@@ -996,6 +1108,8 @@ body.is-client .top { margin-bottom: 8px; }
     ]);
     s.buildings = {};
     s.roads = {};
+    s.ships = {};
+    s.discover = {};
     s.robber = s.board.hexes.find((h) => h.terrain === 'desert').id;
     const all = names.map((_, i) => i);
     s.order = { groups: [all], pending: all.slice(), rolls: names.map(() => []) };
@@ -1015,37 +1129,56 @@ body.is-client .top { margin-bottom: 8px; }
     s.largestArmy = { holder: null, size: 0 };
     s.winner = null;
     s.log = [];
-    log(s, 'La partie commence. Chacun choisit sa couleur.');
+    log(s, (variant === 'sea' ? 'La partie commence sur l\'archipel. ' : 'La partie commence. ') + 'Chacun choisit sa couleur.');
     return s;
   }
 
   // ---------- Requêtes de règles ----------
   const buildingsOf = (s, pid, type) => Object.keys(s.buildings).filter((v) => s.buildings[v].owner === pid && (!type || s.buildings[v].type === type)).length;
   const roadsOf = (s, pid) => Object.keys(s.roads).filter((e) => s.roads[e] === pid).length;
+  // Les parties sauvegardées avant la variante marine n'ont ni bateaux ni découvertes.
+  const shipMap = (s) => s.ships || {};
+  const shipsOf = (s, pid) => Object.values(shipMap(s)).filter((o) => o === pid).length;
+  const occupied = (s, e) => s.roads[e] !== undefined || shipMap(s)[e] !== undefined;
+  const isSea = (s) => s.variant === 'sea';
+  const goalOf = (s) => (isSea(s) ? SEA_WIN_POINTS : WIN_POINTS);
+  const discoveriesOf = (s, pid) => Object.values(s.discover || {}).filter((o) => o === pid).length;
 
+  // Mise en place : sur l'archipel, seulement sur l'île principale (les îlots restent à découvrir).
   function legalSettlements(s, pid, free) {
     return s.board.vertices.filter((v) => {
-      if (s.buildings[v.id]) return false;
+      if (v.land === false || s.buildings[v.id]) return false;
       if (v.nbrs.some((n) => s.buildings[n])) return false;
-      return free || v.edges.some((e) => s.roads[e] === pid);
+      if (free) return !isSea(s) || v.island === 0;
+      return v.edges.some((e) => s.roads[e] === pid || shipMap(s)[e] === pid);
     }).map((v) => v.id);
   }
   function legalCities(s, pid) {
     return Object.keys(s.buildings).filter((v) => s.buildings[v].owner === pid && s.buildings[v].type === 'settlement').map(Number);
   }
+  // Une route prolonge une route, un bateau prolonge un bateau ; on passe de l'un à l'autre seulement par une de ses constructions.
+  function extendable(s, pid, e, pieces) {
+    return [e.a, e.b].some((v) => {
+      const b = s.buildings[v];
+      if (b) return b.owner === pid;
+      return s.board.vertices[v].edges.some((x) => x !== e.id && pieces[x] === pid);
+    });
+  }
   function legalRoads(s, pid, fromVertex) {
     return s.board.edges.filter((e) => {
-      if (s.roads[e.id] !== undefined) return false;
+      if (e.land === false || occupied(s, e.id)) return false;
       if (fromVertex != null) return e.a === fromVertex || e.b === fromVertex;
-      return [e.a, e.b].some((v) => {
-        const b = s.buildings[v];
-        if (b) return b.owner === pid;
-        return s.board.vertices[v].edges.some((x) => x !== e.id && s.roads[x] === pid);
-      });
+      return extendable(s, pid, e, s.roads);
     }).map((e) => e.id);
   }
+  function legalShips(s, pid) {
+    if (!isSea(s)) return [];
+    return s.board.edges.filter((e) => e.sea && !occupied(s, e.id) && extendable(s, pid, e, s.ships)).map((e) => e.id);
+  }
+  const canRoad = (s, pid) => roadsOf(s, pid) < LIMITS.road && legalRoads(s, pid).length > 0;
+  const canShip = (s, pid) => shipsOf(s, pid) < LIMITS.ship && legalShips(s, pid).length > 0;
   function legalRobberHexes(s) {
-    return s.board.hexes.filter((h) => h.id !== s.robber).map((h) => h.id);
+    return s.board.hexes.filter((h) => h.id !== s.robber && h.terrain !== 'sea').map((h) => h.id);
   }
 
   function tradeRatios(s, pid) {
@@ -1062,30 +1195,34 @@ body.is-client .top { margin-bottom: 8px; }
   const devPlayable = (s, p, kind) => p.dev.some((c) => c.k === kind && c.t < s.turnNo);
 
   // Plus longue route d'un joueur : parcours en profondeur, les colonies adverses coupent la chaîne.
+  // Sur l'archipel, routes et bateaux s'enchaînent, mais ne changent de nature que sur une de ses constructions.
   function longestRoadOf(s, pid) {
     const verts = s.board.vertices;
-    const mine = (e) => s.roads[e] === pid;
+    const ships = shipMap(s);
+    const kind = (e) => (s.roads[e] === pid ? 'road' : ships[e] === pid ? 'ship' : null);
+    const own = (v) => s.buildings[v] && s.buildings[v].owner === pid;
     const blocked = (v) => s.buildings[v] && s.buildings[v].owner !== pid;
     const used = new Set();
     const other = (e, v) => (s.board.edges[e].a === v ? s.board.edges[e].b : s.board.edges[e].a);
-    function dfs(v) {
+    function dfs(v, from) {
       let best = 0;
       for (const e of verts[v].edges) {
-        if (!mine(e) || used.has(e)) continue;
+        const k = kind(e);
+        if (!k || used.has(e) || (from && k !== from && !own(v))) continue;
         used.add(e);
         const w = other(e, v);
-        best = Math.max(best, 1 + (blocked(w) ? 0 : dfs(w)));
+        best = Math.max(best, 1 + (blocked(w) ? 0 : dfs(w, k)));
         used.delete(e);
       }
       return best;
     }
     let best = 0;
-    verts.forEach((v) => { if (v.edges.some(mine)) best = Math.max(best, dfs(v.id)); });
+    verts.forEach((v) => { if (v.edges.some(kind)) best = Math.max(best, dfs(v.id, null)); });
     return best;
   }
 
   function points(s, pid, withHidden) {
-    let n = buildingsOf(s, pid, 'settlement') + 2 * buildingsOf(s, pid, 'city');
+    let n = buildingsOf(s, pid, 'settlement') + 2 * buildingsOf(s, pid, 'city') + DISCOVERY_POINTS * discoveriesOf(s, pid);
     if (s.longestRoad.holder === pid) n += 2;
     if (s.largestArmy.holder === pid) n += 2;
     if (withHidden) n += (s.players[pid].dev || []).filter((c) => c.k === 'vp').length;
@@ -1178,7 +1315,7 @@ body.is-client .top { margin-bottom: 8px; }
 
   function afterAction(s) {
     checkRoadAndArmy(s);
-    if (s.phase === 'main' && points(s, s.turn, true) >= WIN_POINTS) {
+    if (s.phase === 'main' && points(s, s.turn, true) >= goalOf(s)) {
       s.phase = 'ended';
       s.step = 'ended';
       s.winner = s.turn;
@@ -1281,7 +1418,15 @@ body.is-client .top { margin-bottom: 8px; }
     s.buildings[a.vertex] = { owner: a.player, type: 'settlement' };
     clearTrade(s);
     log(s, p.name + ' construit une colonie.', p.id);
+    discover(s, p, s.board.vertices[a.vertex].island);
   };
+
+  // Premier colon d'un îlot : points de découverte, une seule fois par îlot.
+  function discover(s, p, island) {
+    if (!isSea(s) || !(island > 0) || s.discover[island] !== undefined) return;
+    s.discover[island] = p.id;
+    log(s, p.name + ' découvre un îlot : +' + DISCOVERY_POINTS + ' points.', p.id);
+  }
 
   handlers.placeCity = (s, a) => {
     mainActions(s, a);
@@ -1319,23 +1464,39 @@ body.is-client .top { margin-bottom: 8px; }
     need(s.phase === 'main', 'Tu ne peux pas faire ça maintenant.');
     need(roadsOf(s, a.player) < LIMITS.road, 'Plus de routes disponibles.');
     need(legalRoads(s, a.player).includes(a.edge), 'Emplacement interdit.');
+    buildOnEdge(s, a, p, 'road');
+  };
+
+  handlers.placeShip = (s, a) => {
+    turnOnly(s, a);
+    need(isSea(s), 'Pas de bateaux dans cette partie.');
+    need(s.phase === 'main', 'Tu ne peux pas faire ça maintenant.');
+    need(shipsOf(s, a.player) < LIMITS.ship, 'Plus de bateaux disponibles.');
+    need(legalShips(s, a.player).includes(a.edge), 'Un bateau se pose en mer, à côté d\'une de tes colonies ou d\'un de tes bateaux.');
+    buildOnEdge(s, a, s.players[a.player], 'ship');
+  };
+
+  // Route ou bateau : gratuit pendant « Construction de routes », payé sinon.
+  function buildOnEdge(s, a, p, kind) {
+    const pieces = kind === 'road' ? s.roads : s.ships;
+    const word = kind === 'road' ? 'une route' : 'un bateau';
     if (s.step === 'roadBuilding') {
-      s.roads[a.edge] = a.player;
+      pieces[a.edge] = a.player;
       s.freeRoads--;
-      log(s, p.name + ' pose une route gratuite.', p.id);
-      if (s.freeRoads <= 0 || roadsOf(s, a.player) >= LIMITS.road || !legalRoads(s, a.player).length) {
+      log(s, p.name + ' pose ' + word + ' gratuit' + (kind === 'road' ? 'e' : '') + '.', p.id);
+      if (s.freeRoads <= 0 || (!canRoad(s, a.player) && !canShip(s, a.player))) {
         s.freeRoads = 0;
         s.step = s.returnStep;
       }
       return;
     }
     need(s.step === 'actions', 'Tu ne peux pas faire ça maintenant.');
-    need(has(p.hand, COST.road), 'Pas assez de ressources.');
-    pay(s, p, COST.road);
-    s.roads[a.edge] = a.player;
+    need(has(p.hand, COST[kind]), 'Pas assez de ressources.');
+    pay(s, p, COST[kind]);
+    pieces[a.edge] = a.player;
     clearTrade(s);
-    log(s, p.name + ' construit une route.', p.id);
-  };
+    log(s, p.name + (kind === 'road' ? ' construit une route.' : ' met un bateau à l\'eau.'), p.id);
+  }
 
   handlers.roll = (s, a) => {
     turnOnly(s, a);
@@ -1440,10 +1601,11 @@ body.is-client .top { margin-bottom: 8px; }
   };
 
   handlers.playRoadBuilding = (s, a) => {
-    need(roadsOf(s, a.player) < LIMITS.road && legalRoads(s, a.player).length > 0, 'Aucune route possible.');
+    need(canRoad(s, a.player) || canShip(s, a.player), isSea(s) ? 'Aucune route ni aucun bateau possible.' : 'Aucune route possible.');
     const prev = s.step;
     const p = useDev(s, a, 'roadBuilding');
-    s.freeRoads = Math.min(2, LIMITS.road - roadsOf(s, a.player));
+    const left = (LIMITS.road - roadsOf(s, a.player)) + (isSea(s) ? LIMITS.ship - shipsOf(s, a.player) : 0);
+    s.freeRoads = Math.min(2, left);
     s.returnStep = prev;
     s.step = 'roadBuilding';
     log(s, p.name + ' joue Construction de routes.', p.id);
@@ -1582,7 +1744,9 @@ body.is-client .top { margin-bottom: 8px; }
       setupSettlement: mine && s.phase === 'setup' && s.step === 'settlement',
       setupRoad: mine && s.phase === 'setup' && s.step === 'road',
       freeRoad: mine && s.step === 'roadBuilding',
-      road: acts && afford(COST.road) && roadsOf(s, pid) < LIMITS.road && legalRoads(s, pid).length > 0,
+      freeShip: mine && s.step === 'roadBuilding' && canShip(s, pid),
+      road: acts && afford(COST.road) && canRoad(s, pid),
+      ship: acts && afford(COST.ship) && canShip(s, pid),
       settlement: acts && afford(COST.settlement) && buildingsOf(s, pid, 'settlement') < LIMITS.settlement && legalSettlements(s, pid, false).length > 0,
       city: acts && afford(COST.city) && buildingsOf(s, pid, 'city') < LIMITS.city && legalCities(s, pid).length > 0,
       buyDev: acts && afford(COST.dev) && (s.devDeck ? s.devDeck.length : s.devDeckCount) > 0,
@@ -1590,24 +1754,29 @@ body.is-client .top { margin-bottom: 8px; }
       ratios: tradeRatios(s, pid),
       dev: {
         knight: canDevNow && devPlayable(s, p, 'knight'),
-        roadBuilding: canDevNow && devPlayable(s, p, 'roadBuilding') && legalRoads(s, pid).length > 0 && roadsOf(s, pid) < LIMITS.road,
+        roadBuilding: canDevNow && devPlayable(s, p, 'roadBuilding') && (canRoad(s, pid) || canShip(s, pid)),
         yearOfPlenty: canDevNow && devPlayable(s, p, 'yearOfPlenty') && total(s.bank) >= 2,
         monopoly: canDevNow && devPlayable(s, p, 'monopoly'),
       },
       respondTrade: !!(s.trade && s.trade.from !== pid && s.phase === 'main'),
     };
-    // Surlignage de plateau selon l'étape.
-    out.targets = { vertices: [], edges: [], hexes: [] };
+    // Surlignage de plateau selon l'étape ; edgeKind dit quelle pièce poser sur les arêtes surlignées.
+    out.targets = { vertices: [], edges: [], hexes: [], edgeKind: 'road' };
     if (out.setupSettlement) out.targets.vertices = legalSettlements(s, pid, true);
     if (out.setupRoad) out.targets.edges = legalRoads(s, pid, s.setup.last);
     if (out.moveRobber) out.targets.hexes = legalRobberHexes(s);
-    if (out.freeRoad) out.targets.edges = legalRoads(s, pid);
+    if (out.freeRoad) {
+      const roads = canRoad(s, pid) ? legalRoads(s, pid) : [];
+      if (roads.length || !out.freeShip) out.targets.edges = roads;
+      else Object.assign(out.targets, { edges: legalShips(s, pid), edgeKind: 'ship' });
+    }
     return out;
   }
 
   // Emplacements pour un mode de construction demandé depuis la main.
   function targetsFor(s, pid, kind) {
-    if (kind === 'road') return { edges: legalRoads(s, pid) };
+    if (kind === 'road') return { edges: legalRoads(s, pid), edgeKind: 'road' };
+    if (kind === 'ship') return { edges: legalShips(s, pid), edgeKind: 'ship' };
     if (kind === 'settlement') return { vertices: legalSettlements(s, pid, false) };
     if (kind === 'city') return { vertices: legalCities(s, pid) };
     return {};
@@ -1649,10 +1818,10 @@ body.is-client .top { margin-bottom: 8px; }
   }
 
   return {
-    RES, RES_FR, DEV_FR, TERRAIN_RES, COLORS, COLOR_FR, COST, LIMITS, WIN_POINTS,
+    RES, RES_FR, DEV_FR, TERRAIN_RES, COLORS, COLOR_FR, COST, LIMITS, WIN_POINTS, SEA_WIN_POINTS, DISCOVERY_POINTS, VARIANTS,
     newGame, boardFromSeed, apply, available, targetsFor, actors, viewFor,
-    points, total, longestRoadOf, tradeRatios,
-    legalSettlements, legalCities, legalRoads,
+    points, total, longestRoadOf, tradeRatios, goalOf, discoveriesOf,
+    legalSettlements, legalCities, legalRoads, legalShips,
   };
 });
 
@@ -2252,6 +2421,7 @@ body.is-client .top { margin-bottom: 8px; }
     knight: 'Déplace le voleur et vole une carte.',
     vp: 'Compte 1 point, reste caché.',
     roadBuilding: 'Pose 2 routes gratuites.',
+    roadBuildingSea: 'Pose 2 routes ou bateaux gratuits.',
     yearOfPlenty: 'Prends 2 cartes de ton choix à la banque.',
     monopoly: 'Tous les autres te donnent une ressource choisie.',
   };
@@ -2282,7 +2452,7 @@ body.is-client .top { margin-bottom: 8px; }
   const ui = {
     screen: 'menu', pin: null, mode: null, tradeOpen: false, tab: 'bank', bankGive: null, bankGet: null,
     give: zero(), want: zero(), discard: zero(), pick: null, yop: [], toast: '', confirmNew: false,
-    count: 3, names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: null, diceAt: 0, orderSeen: null, stageTimer: 0, pieces: null, news: [], newsNow: [], newsTimer: 0, lastTurn: -1, fxKey: null, fx: null, fxNow: null, fxTimer: 0, gain: null, gainTimer: 0, lastHand: null,
+    count: 3, variant: 'classic', names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: null, diceAt: 0, orderSeen: null, stageTimer: 0, pieces: null, news: [], newsNow: [], newsTimer: 0, lastTurn: -1, fxKey: null, fx: null, fxNow: null, fxTimer: 0, gain: null, gainTimer: 0, lastHand: null,
     code: '', joinCode: '', myName: '', error: '', busy: false,
     seat: -1, boardSeed: null, board: null, conn: 'searching', lobby: [], pending: 0, phoneTab: 'hand', needBoard: false, wasNeed: false, wasMine: false,
   };
@@ -2295,7 +2465,7 @@ body.is-client .top { margin-bottom: 8px; }
     del(k) { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } },
   };
   const slim = (g) => Object.assign({}, g, { board: undefined });
-  const fat = (g) => { if (g && !g.board) g.board = E.boardFromSeed(g.seed); return g; };
+  const fat = (g) => { if (g && !g.board) g.board = E.boardFromSeed(g.seed, g.variant); return g; };
   const validGame = (g) => g && g.players && (g.board || g.seed != null);
   function save() {
     if (mode === 'local') store.set(SAVE_KEY, slim(game));
@@ -2330,7 +2500,7 @@ body.is-client .top { margin-bottom: 8px; }
   }
   // Actions que le téléphone peut montrer tout de suite : elles ne dépendent d'aucun secret (dés, pioche, main des autres).
   // L'hôte tranche ; sa vue remplace de toute façon l'affichage anticipé.
-  const ANTICIPATED = new Set(['pickColor', 'placeSettlement', 'placeRoad', 'placeCity', 'endTurn', 'bankTrade', 'discard', 'offerTrade', 'cancelTrade', 'respondTrade']);
+  const ANTICIPATED = new Set(['pickColor', 'placeSettlement', 'placeRoad', 'placeShip', 'placeCity', 'endTurn', 'bankTrade', 'discard', 'offerTrade', 'cancelTrade', 'respondTrade']);
   function anticipate(action) {
     if (!ANTICIPATED.has(action.type)) return;
     try {
@@ -2367,26 +2537,20 @@ body.is-client .top { margin-bottom: 8px; }
     let tg = av.targets;
     if (ui.mode && av.myTurn) tg = Object.assign({ vertices: [], edges: [], hexes: [] }, E.targetsFor(s, pid, ui.mode));
     tg = Object.assign({ vertices: [], edges: [], hexes: [] }, tg);
+    const edgeKind = tg.edgeKind || 'road';
     ui.needBoard = !!(tg.vertices.length || tg.edges.length || tg.hexes.length);
     const out = [];
-    out.push('<ellipse cx="0" cy="0" rx="530" ry="490" fill="var(--sea)" stroke="var(--sea-edge)" stroke-width="6"/><ellipse cx="0" cy="0" rx="530" ry="490" fill="url(#waves)"/><ellipse cx="0" cy="0" rx="530" ry="490" fill="url(#seagrad)"/>');
-
-    b.ports.forEach((p) => {
-      const bx = X(p.x + p.nx * 0.62), by = X(p.y + p.ny * 0.62);
-      [p.a, p.b].forEach((v) => {
-        out.push('<line x1="' + bx + '" y1="' + by + '" x2="' + X(b.vertices[v].x) + '" y2="' + X(b.vertices[v].y) + '" stroke="var(--pier)" stroke-width="7" stroke-linecap="round"/>');
-      });
-      const generic = p.type === 'any';
-      out.push('<g transform="translate(' + bx + ' ' + by + ')"><circle r="29" fill="var(--surface)" stroke="var(--pier)" stroke-width="4"/>' +
-        (generic
-          ? '<text y="7" text-anchor="middle" font-size="19" font-weight="800" fill="var(--ink)" font-family="var(--f-display)">3:1</text>'
-          : '<use href="#g-' + p.type + '" x="-13" y="-25" width="26" height="26"/><text y="20" text-anchor="middle" font-size="14" font-weight="800" fill="var(--ink)" font-family="var(--f-display)">2:1</text>') +
-        '</g>');
-    });
+    if (s.variant === 'sea') {
+      const vb = boardBox(b);
+      out.push('<rect x="' + vb.x + '" y="' + vb.y + '" width="' + vb.w + '" height="' + vb.h + '" fill="url(#seagrad)"/>');
+    } else {
+      out.push('<ellipse cx="0" cy="0" rx="530" ry="490" fill="var(--sea)" stroke="var(--sea-edge)" stroke-width="6"/><ellipse cx="0" cy="0" rx="530" ry="490" fill="url(#waves)"/><ellipse cx="0" cy="0" rx="530" ry="490" fill="url(#seagrad)"/>');
+    }
 
     const hexMarkup = (h) => {
       const out = [];
       const pts = h.vertices.map((v) => X(b.vertices[v].x) + ',' + X(b.vertices[v].y)).join(' ');
+      if (h.terrain === 'sea') return '<polygon class="sea-hex" points="' + pts + '"/>';
       const cx = X(h.x), cy = X(h.y);
       const g = GLYPH[h.terrain];
       const flip = (h.id * 7 + h.q * 3 + h.r) % 2 ? ' scale(-1 1)' : '';
@@ -2407,7 +2571,15 @@ body.is-client .top { margin-bottom: 8px; }
       }
       return out.join('');
     };
-    b.hexes.forEach((h) => out.push('<g class="bh">' + hexMarkup(h) + '</g>'));
+    // La mer d'abord, pour que les ports et la côte passent par-dessus.
+    b.hexes.filter((h) => h.terrain === 'sea').forEach((h) => out.push(hexMarkup(h)));
+    out.push(portsHTML(b));
+    b.hexes.filter((h) => h.terrain !== 'sea').forEach((h) => out.push('<g class="bh">' + hexMarkup(h) + '</g>'));
+
+    Object.keys(s.ships || {}).forEach((k) => {
+      const m = edgeMid(b, +k), fresh = newsAt('ship', +k);
+      out.push('<g transform="translate(' + X(m.x) + ' ' + X(m.y) + ')">' + (fresh ? '<g class="drop" style="--el:-' + fresh.elapsed + 'ms">' + shipSvg(s.ships[k]) + '</g>' : shipSvg(s.ships[k])) + '</g>');
+    });
 
     Object.keys(s.roads).forEach((k) => {
       const e = b.edges[+k], A = b.vertices[e.a], B = b.vertices[e.b];
@@ -2435,11 +2607,11 @@ body.is-client .top { margin-bottom: 8px; }
     tg.edges.forEach((id) => {
       const e = b.edges[id], A = b.vertices[e.a], B = b.vertices[e.b];
       const c = ' x1="' + X(A.x + (B.x - A.x) * 0.16) + '" y1="' + X(A.y + (B.y - A.y) * 0.16) + '" x2="' + X(A.x + (B.x - A.x) * 0.84) + '" y2="' + X(A.y + (B.y - A.y) * 0.84) + '"';
-      out.push('<line class="tgt-e"' + c + '/><line class="hit hit-e" data-e="' + id + '"' + c + '/>');
+      out.push('<line class="tgt-e' + (edgeKind === 'ship' ? ' ship' : '') + '"' + c + '/><line class="hit hit-e" data-e="' + id + '" data-k="' + edgeKind + '"' + c + '/>');
     });
 
     ui.newsNow.forEach((n) => {
-      const at = n.kind === 'road' ? edgeMid(b, n.at) : b.vertices[n.at];
+      const at = onEdge(n.kind) ? edgeMid(b, n.at) : b.vertices[n.at];
       out.push('<circle class="fx-new" cx="' + X(at.x) + '" cy="' + X(at.y) + '" r="34" stroke="' + pcolor(n.owner) + '" style="--el:-' + n.elapsed + 'ms"/>');
     });
 
@@ -2470,6 +2642,38 @@ body.is-client .top { margin-bottom: 8px; }
     return out.join('');
   }
 
+  function portsHTML(b) {
+    return b.ports.map((p) => {
+      const bx = X(p.x + p.nx * 0.62), by = X(p.y + p.ny * 0.62);
+      const piers = [p.a, p.b].map((v) => '<line x1="' + bx + '" y1="' + by + '" x2="' + X(b.vertices[v].x) + '" y2="' + X(b.vertices[v].y) + '" stroke="var(--pier)" stroke-width="7" stroke-linecap="round"/>').join('');
+      const generic = p.type === 'any';
+      return piers + '<g transform="translate(' + bx + ' ' + by + ')"><circle r="29" fill="var(--surface)" stroke="var(--pier)" stroke-width="4"/>' +
+        (generic
+          ? '<text y="7" text-anchor="middle" font-size="19" font-weight="800" fill="var(--ink)" font-family="var(--f-display)">3:1</text>'
+          : '<use href="#g-' + p.type + '" x="-13" y="-25" width="26" height="26"/><text y="20" text-anchor="middle" font-size="14" font-weight="800" fill="var(--ink)" font-family="var(--f-display)">2:1</text>') +
+        '</g>';
+    }).join('');
+  }
+  // Bateau dessiné droit au milieu de l'arête : coque et grand-voile à la couleur du joueur.
+  const shipSvg = (owner) => '<g class="ship" fill="' + pcolor(owner) + '"><path d="M-25 4H25L16 17H-16Z"/><path d="M1-30V4" fill="none"/><path d="M4-28 22 0H4Z"/><path d="M-3-22-18 0H-3Z" fill="#fffaf0"/></g>';
+  // Cadre du plateau marin : les cases et les ports, avec une petite marge.
+  const boxes = new WeakMap();
+  function boardBox(b) {
+    if (boxes.has(b)) return boxes.get(b);
+    const xs = [], ys = [];
+    b.vertices.forEach((v) => { xs.push(X(v.x)); ys.push(X(v.y)); });
+    b.ports.forEach((p) => { xs.push(X(p.x + p.nx * 0.62) + 34, X(p.x + p.nx * 0.62) - 34); ys.push(X(p.y + p.ny * 0.62) + 34, X(p.y + p.ny * 0.62) - 34); });
+    const x = Math.min(...xs) - 24, y = Math.min(...ys) - 24;
+    const box = { x, y, w: Math.max(...xs) + 24 - x, h: Math.max(...ys) + 24 - y };
+    boxes.set(b, box);
+    return box;
+  }
+  function viewBoxOf(b) {
+    if (game.variant !== 'sea') return '-560 -520 1120 1040';
+    const box = boardBox(b);
+    return [box.x, box.y, box.w, box.h].join(' ');
+  }
+
   function resetFx() { ui.fxKey = null; ui.fx = null; ui.fxNow = null; ui.gain = null; ui.lastHand = null; ui.orderSeen = null; ui.diceKey = null; ui.pieces = null; ui.news = []; }
 
   // ---------- Annonce des constructions, façon écran de bowling : on compare les pièces au rendu précédent ----------
@@ -2477,15 +2681,17 @@ body.is-client .top { margin-bottom: 8px; }
   const PIECE_PATH = { settlement: 'M-11 10V-2L0-13 11-2V10Z', city: 'M-15 10V-2H-6V-12L2-19 10-12V-2H15V10Z' };
   const NEWS = {
     road: { word: 'ROUTE !', text: 'pose une route' },
+    ship: { word: 'À L\'EAU !', text: 'met un bateau à l\'eau' },
     settlement: { word: 'COLONIE !', text: 'construit une colonie', pts: 1 },
     city: { word: 'VILLE !', text: 'construit une ville', pts: 1 },
   };
   const CONFETTI = ['var(--pc)', '#ffd34d', '#ffffff', '#5fd0e0', 'var(--pc)', '#ff7a59'];
-  const newsAt = (kind, at) => ui.newsNow.find((n) => (kind === 'road') === (n.kind === 'road') && n.at === at);
+  const onEdge = (kind) => kind === 'road' || kind === 'ship';
+  const newsAt = (kind, at) => ui.newsNow.find((n) => onEdge(kind) === onEdge(n.kind) && n.at === at);
   const edgeMid = (b, id) => { const e = b.edges[id]; return { x: (b.vertices[e.a].x + b.vertices[e.b].x) / 2, y: (b.vertices[e.a].y + b.vertices[e.b].y) / 2 }; };
   function trackBuilds() {
     const s = game;
-    const now = { roads: Object.assign({}, s.roads), buildings: {} };
+    const now = { roads: Object.assign({}, s.roads), ships: Object.assign({}, s.ships), buildings: {} };
     Object.keys(s.buildings).forEach((k) => { now.buildings[k] = s.buildings[k].type; });
     const prev = ui.pieces;
     ui.pieces = now;
@@ -2493,6 +2699,7 @@ body.is-client .top { margin-bottom: 8px; }
     const t = Date.now();
     const added = [];
     Object.keys(now.roads).forEach((k) => { if (prev.roads[k] === undefined) added.push({ kind: 'road', at: +k, owner: now.roads[k], t }); });
+    Object.keys(now.ships).forEach((k) => { if (prev.ships[k] === undefined) added.push({ kind: 'ship', at: +k, owner: now.ships[k], t }); });
     Object.keys(now.buildings).forEach((k) => {
       if (now.buildings[k] !== prev.buildings[k]) added.push({ kind: now.buildings[k], at: +k, owner: s.buildings[k].owner, t });
     });
@@ -2510,7 +2717,8 @@ body.is-client .top { margin-bottom: 8px; }
     const c = pcolor(owner);
     const shape = kind === 'road'
       ? '<line x1="-13" y1="5" x2="13" y2="-7" stroke="#1b1b1b" stroke-width="9" stroke-linecap="round"/><line x1="-13" y1="5" x2="13" y2="-7" stroke="' + c + '" stroke-width="5" stroke-linecap="round"/>'
-      : '<path class="piece" d="' + PIECE_PATH[kind] + '" fill="' + c + '"/>';
+      : kind === 'ship' ? '<g transform="translate(0 -2) scale(.55)">' + shipSvg(owner) + '</g>'
+        : '<path class="piece" d="' + PIECE_PATH[kind] + '" fill="' + c + '"/>';
     return '<svg class="bowl-piece" viewBox="-18 -21 36 33" aria-hidden="true">' + shape + '</svg>';
   }
   // Positions des confettis fixes par indice : un nouveau rendu en pleine animation ne les déplace pas.
@@ -2527,8 +2735,8 @@ body.is-client .top { margin-bottom: 8px; }
     if (n) {
       const info = NEWS[n.kind];
       const letters = Array.from(info.word).map((ch, i) => '<span style="--i:' + i + '">' + (ch === ' ' ? '&nbsp;' : esc(ch)) + '</span>').join('');
-      html = '<div class="bowl' + (n.kind === 'road' ? ' small' : '') + '" style="--pc:' + pcolor(n.owner) + ';--el:-' + n.elapsed + 'ms"><div class="bowl-in">' +
-        '<div class="bowl-rays"></div><div class="bowl-confetti">' + confettiHTML(n.kind === 'road' ? 10 : 22) + '</div>' +
+      html = '<div class="bowl' + (onEdge(n.kind) ? ' small' : '') + '" style="--pc:' + pcolor(n.owner) + ';--el:-' + n.elapsed + 'ms"><div class="bowl-in">' +
+        '<div class="bowl-rays"></div><div class="bowl-confetti">' + confettiHTML(onEdge(n.kind) ? 10 : 22) + '</div>' +
         pieceIcon(n.kind, n.owner) + '<div class="bowl-word" aria-hidden="true">' + letters + '</div>' +
         '<div class="bowl-who"><span class="dot"></span><span><b>' + esc(game.players[n.owner].name) + '</b> ' + info.text + '</span></div>' +
         (info.pts ? '<div class="bowl-stamp">+' + info.pts + ' pt</div>' : '') + '</div></div>';
@@ -2680,14 +2888,17 @@ body.is-client .top { margin-bottom: 8px; }
       const badges = (s.phase === 'order' && s.order.rolls[i].length ? '<span class="badge">Dé : ' + rollsText(s, i) + '</span>' : '') +
         (s.longestRoad.holder === i ? '<span class="badge">Plus longue route</span>' : '') +
         (s.largestArmy.holder === i ? '<span class="badge">Plus grande armée</span>' : '') +
+        (E.discoveriesOf(s, i) ? '<span class="badge">Îlot' + (E.discoveriesOf(s, i) > 1 ? 's' : '') + ' découvert' + (E.discoveriesOf(s, i) > 1 ? 's' : '') + ' : ' + E.discoveriesOf(s, i) + '</span>' : '') +
         (mode === 'host' && !on.has(i) ? '<span class="badge off">Hors ligne</span>' : '');
       const tag = mode === 'local' && i === v ? ' <small>(affiché)</small>' : (mode === 'client' && i === v ? ' <small>(toi)</small>' : '');
       return '<li class="pl' + (i === s.turn && s.phase !== 'ended' ? ' turn' : '') + '" style="--pc:' + pcolor(i) + '">' +
         '<span class="dot"></span><b>' + esc(p.name) + tag + '</b><span class="pts" title="Points visibles">' + E.points(s, i, false) + '</span>' +
         '<span class="meta"><span>' + cardsOf(p) + ' cartes</span><span>' + devOf(p) + ' dév.</span><span>' + p.knights + ' chevalier' + (p.knights > 1 ? 's' : '') + '</span><span>route ' + (p.roadLen || 0) + '</span>' + badges + '</span></li>';
     }).join('');
-    return '<h2>Joueurs · objectif ' + E.WIN_POINTS + ' points</h2><ul class="players">' + rows + '</ul>' +
-      '<div class="bank"><b>Pioche</b><span>' + deckOf(s) + ' cartes de développement</span></div>';
+    const islets = s.variant === 'sea' ? 3 - Object.keys(s.discover).length : 0;
+    return '<h2>Joueurs · objectif ' + E.goalOf(s) + ' points</h2><ul class="players">' + rows + '</ul>' +
+      '<div class="bank"><b>Pioche</b><span>' + deckOf(s) + ' cartes de développement</span></div>' +
+      (islets ? '<div class="bank"><b>Îlots</b><span>' + islets + ' à découvrir · ' + E.DISCOVERY_POINTS + ' points au premier colon</span></div>' : '');
   }
 
   // ---------- Main du joueur ----------
@@ -2715,7 +2926,11 @@ body.is-client .top { margin-bottom: 8px; }
     }
     if (s.step === 'robber') return s.turn === v ? { t: 'Déplace le voleur : touche un hexagone.', go: true } : { t: turnName + ' déplace le voleur.', go: false };
     if (s.step === 'steal') return s.turn === v ? { t: 'Choisis à qui voler une carte.', go: true } : { t: turnName + ' choisit sa victime.', go: false };
-    if (s.step === 'roadBuilding') return s.turn === v ? { t: 'Pose encore ' + s.freeRoads + ' route' + (s.freeRoads > 1 ? 's' : '') + ' gratuite' + (s.freeRoads > 1 ? 's' : '') + '.', go: true } : { t: turnName + ' pose des routes.', go: false };
+    if (s.step === 'roadBuilding') {
+      const n = s.freeRoads, pl = n > 1 ? 's' : '';
+      if (s.turn !== v) return { t: turnName + ' pose des ' + (s.variant === 'sea' ? 'routes ou des bateaux.' : 'routes.'), go: false };
+      return { t: 'Pose encore ' + n + (s.variant === 'sea' ? ' route' + pl + ' ou bateau' + (n > 1 ? 'x' : '') + ' gratuit' + pl : ' route' + pl + ' gratuite' + pl) + '.', go: true };
+    }
     if (s.turn !== v) return { t: 'Au tour de ' + turnName + '.', go: false };
     if (s.step === 'roll') return { t: 'À toi de jouer : lance les dés.', go: true };
     if (ui.mode) return { t: 'Touche un emplacement lumineux sur le plateau.', go: true };
@@ -2832,6 +3047,11 @@ body.is-client .top { margin-bottom: 8px; }
         '<button class="btn" data-act="step" data-set="discard" data-r="' + r + '" data-d="1"' + (ui.discard[r] < me.hand[r] && n < av.discard ? '' : ' disabled') + '>+</button></div>').join('') +
         '</div><button class="btn primary" data-act="discard"' + (n === av.discard ? '' : ' disabled') + '>Défausser</button></div>';
     }
+    if (av.freeRoad && av.freeShip) {
+      const kind = ui.mode || av.targets.edgeKind;
+      html += '<div class="section-title">Pièce gratuite</div><div class="seg" role="group">' + [['road', 'Route'], ['ship', 'Bateau']].map(([k, label]) =>
+        '<button class="btn" data-act="free-kind" data-k="' + k + '" aria-pressed="' + (kind === k) + '">' + label + '</button>').join('') + '</div>';
+    }
     if (av.steal) {
       html += '<div class="row">' + av.steal.map((i) => '<button class="btn" data-act="steal" data-i="' + i + '"><span class="dot" style="--pc:' + pcolor(i) + '"></span>Voler à ' + esc(s.players[i].name) + '</button>').join('') + '</div>';
     }
@@ -2847,7 +3067,8 @@ body.is-client .top { margin-bottom: 8px; }
       html += '<div class="section-title">Cartes de développement</div><div class="devs">' + kindKeys.map((k) => {
         const info = kinds[k];
         const playable = k !== 'vp' && av.dev[k];
-        const note = k === 'vp' ? DEV_HELP.vp : (info.ready < info.n ? 'Achetée ce tour, jouable au prochain. ' : '') + DEV_HELP[k];
+        const help = k === 'roadBuilding' && s.variant === 'sea' ? DEV_HELP.roadBuildingSea : DEV_HELP[k];
+        const note = k === 'vp' ? help : (info.ready < info.n ? 'Achetée ce tour, jouable au prochain. ' : '') + help;
         return '<div class="dev"><span class="cnt">' + info.n + '</span><span class="nm">' + E.DEV_FR[k] + '<small>' + note + '</small></span>' +
           (k === 'vp' ? '' : '<button class="btn small" data-act="dev" data-k="' + k + '"' + (playable ? '' : ' disabled') + '>Jouer</button>') + '</div>';
       }).join('') + '</div>';
@@ -2862,9 +3083,9 @@ body.is-client .top { margin-bottom: 8px; }
 
     if (av.myTurn && s.phase === 'main' && s.step === 'actions') {
       const b = (k, label, cost, on) => '<button class="btn build" data-act="mode" data-k="' + k + '" aria-pressed="' + (ui.mode === k) + '"' + (on ? '' : ' disabled') + '><span>' + label + '</span><span class="cost">' + costIcons(cost) + '</span></button>';
-      html += '<div class="section-title">Construire</div><div class="builds">' +
-        b('road', 'Route', E.COST.road, av.road) + b('settlement', 'Colonie', E.COST.settlement, av.settlement) +
-        b('city', 'Ville', E.COST.city, av.city) +
+      html += '<div class="section-title">Construire</div><div class="builds' + (s.variant === 'sea' ? ' five' : '') + '">' +
+        b('road', 'Route', E.COST.road, av.road) + (s.variant === 'sea' ? b('ship', 'Bateau', E.COST.ship, av.ship) : '') +
+        b('settlement', 'Colonie', E.COST.settlement, av.settlement) + b('city', 'Ville', E.COST.city, av.city) +
         '<button class="btn build" data-act="buy"' + (av.buyDev ? '' : ' disabled') + '><span>Carte dév.</span><span class="cost">' + costIcons(E.COST.dev) + '</span></button></div>';
       if (ui.mode) html += '<button class="btn small" data-act="mode" data-k="' + ui.mode + '">Annuler la construction</button>';
       html += '<button class="btn" data-act="trade-toggle" aria-expanded="' + ui.tradeOpen + '">' + (ui.tradeOpen ? 'Fermer le commerce' : 'Commerce') + '</button>';
@@ -2923,15 +3144,25 @@ body.is-client .top { margin-bottom: 8px; }
     const savedHost = store.get(HOST_KEY);
     let html = '<h2>Une île, cinq ressources, dix points</h2><p>Construis des routes, des colonies et des villes. Le premier à ' + E.WIN_POINTS + ' points gagne.</p><div class="modes">';
     if (savedHost && savedHost.game && savedHost.game.phase !== 'ended') {
-      html += '<button class="mode-card resume" data-act="host-resume"><b>Reprendre la partie en ligne</b><span>Salle ' + esc(savedHost.code) + ' · ' + savedHost.game.players.map((p) => esc(p.name)).join(', ') + '</span></button>';
+      html += '<button class="mode-card resume" data-act="host-resume"><b>Reprendre la partie en ligne</b><span>Salle ' + esc(savedHost.code) + (savedHost.game.variant === 'sea' ? ' · Archipel' : '') + ' · ' + savedHost.game.players.map((p) => esc(p.name)).join(', ') + '</span></button>';
     }
     if (saved && saved.players && saved.phase !== 'ended') {
-      html += '<button class="mode-card resume" data-act="resume"><b>Reprendre la partie sur un écran</b><span>' + saved.players.map((p) => esc(p.name)).join(', ') + '</span></button>';
+      html += '<button class="mode-card resume" data-act="resume"><b>Reprendre la partie sur un écran</b><span>' + (saved.variant === 'sea' ? 'Archipel · ' : '') + saved.players.map((p) => esc(p.name)).join(', ') + '</span></button>';
     }
     html += '<button class="mode-card" data-act="goto" data-s="host"><b>Plateau sur cet écran</b><span>Ordinateur ou télé. Chaque joueur voit sa main sur son téléphone.</span></button>' +
       '<button class="mode-card" data-act="goto" data-s="join"><b>Rejoindre depuis mon téléphone</b><span>Entre le code affiché sur l\'écran du plateau.</span></button>' +
       '<button class="mode-card" data-act="goto" data-s="setup"><b>Un seul écran pour tous</b><span>On se passe l\'appareil, sans téléphones.</span></button></div>';
     return html;
+  }
+
+  // Choix du plateau, sur l'écran qui lance la partie.
+  function variantHTML() {
+    const opts = [
+      ['classic', 'Classique', 'Une île, des routes. Victoire à ' + E.WIN_POINTS + ' points.'],
+      ['sea', 'Archipel', 'Une île et trois îlots au large : bateaux, ' + E.DISCOVERY_POINTS + ' points au premier colon de chaque îlot. Victoire à ' + E.SEA_WIN_POINTS + ' points.'],
+    ];
+    return '<div><div class="section-title">Plateau</div><div class="variants" role="group" aria-label="Plateau">' + opts.map(([k, title, text]) =>
+      '<button class="variant" data-act="variant" data-k="' + k + '" aria-pressed="' + (ui.variant === k) + '"><b>' + title + '</b><span>' + text + '</span></button>').join('') + '</div></div>';
   }
 
   function setupHTML() {
@@ -2941,6 +3172,7 @@ body.is-client .top { margin-bottom: 8px; }
       '<div class="names">' + Array.from({ length: ui.count }, (_, i) =>
         '<label class="name-row"><span class="sr">Nom du joueur ' + (i + 1) + '</span>' +
         '<input id="name' + i + '" type="text" maxlength="14" value="' + esc(ui.names[i]) + '" autocomplete="off"></label>').join('') + '</div>' +
+      variantHTML() +
       '<p class="note">Chacun choisit sa couleur au début de la partie.</p>' +
       '<button class="btn primary big" data-act="start">Lancer la partie</button>';
   }
@@ -2956,7 +3188,7 @@ body.is-client .top { margin-bottom: 8px; }
     html += '<div><div class="section-title">Joueurs connectés (' + players.length + '/4)</div><ul class="players">' + (players.length ? players.slice(0, 4).map((p, i) =>
       '<li class="pl"><span class="dot"></span><b>' + esc(p.name) + '</b></li>').join('') : '<li class="pl empty">En attente des téléphones…</li>') + '</ul>' +
       (players.length > 4 ? '<p class="note">Seuls les 4 premiers arrivés joueront.</p>' : '') + '</div>';
-    html += '<button class="btn primary big" data-act="host-start"' + (players.length >= 2 ? '' : ' disabled') + '>Lancer la partie</button>' +
+    html += variantHTML() + '<button class="btn primary big" data-act="host-start"' + (players.length >= 2 ? '' : ' disabled') + '>Lancer la partie</button>' +
       (inArtifact() ? '<p class="note">Les joueurs doivent avoir accès à l\'artefact (partage avec droit de contribution). Ne republie pas la page pendant une partie : cela déconnecte tout le monde.</p>' : '<p class="note">Aucun compte à créer. Les échanges entre appareils sont chiffrés : le serveur de salle ne voit passer que des messages illisibles.</p>');
     return html;
   }
@@ -3033,6 +3265,7 @@ body.is-client .top { margin-bottom: 8px; }
     trackOrder();
     ui.fxNow = activeFx();
     ui.newsNow = activeNews();
+    $('board').setAttribute('viewBox', viewBoxOf(game.board));
     $('board').innerHTML = boardHTML();
     $('board').setAttribute('class', ui.fxNow ? 'fx-on' : '');
     if (ui.fxNow) $('board').style.setProperty('--el', '-' + ui.fxNow.elapsed + 'ms');
@@ -3070,7 +3303,7 @@ body.is-client .top { margin-bottom: 8px; }
       ui.names[i] = v;
       names.push(v);
     }
-    game = E.newGame({ names, seed: newSeed() });
+    game = E.newGame({ names, seed: newSeed(), variant: ui.variant });
     mode = 'local';
     resetFx();
     ui.pin = null; ui.mode = null; ui.lastTurn = -1; ui.tradeOpen = false; ui.confirmNew = false;
@@ -3134,7 +3367,7 @@ body.is-client .top { margin-bottom: 8px; }
   function hostStart() {
     const players = hostNet.lobby().slice(0, 4);
     if (players.length < 2) return;
-    game = E.newGame({ names: players.map((p) => p.name), seed: newSeed() });
+    game = E.newGame({ names: players.map((p) => p.name), seed: newSeed(), variant: ui.variant });
     const seats = {};
     players.forEach((p, i) => { seats[p.pub] = i; });
     hostNet.setSeats(seats);
@@ -3201,7 +3434,8 @@ body.is-client .top { margin-bottom: 8px; }
   function onPhoneView(p) {
     if (!game) resetFx();
     const view = p.view;
-    if (ui.boardSeed !== view.seed || !ui.board) { ui.board = E.boardFromSeed(view.seed); ui.boardSeed = view.seed; }
+    const key = view.seed + ':' + view.variant;
+    if (ui.boardSeed !== key || !ui.board) { ui.board = E.boardFromSeed(view.seed, view.variant); ui.boardSeed = key; }
     view.board = ui.board;
     game = view;
     ui.seat = p.seat;
@@ -3225,6 +3459,8 @@ body.is-client .top { margin-bottom: 8px; }
     leave: leaveGame,
     start: startLocal,
     resume: () => { const g = store.get(SAVE_KEY); if (validGame(g)) { game = fat(g); mode = 'local'; resetFx(); ui.lastTurn = -1; render(); } },
+    variant: (t) => { ui.names.forEach((n, i) => { const el = $('name' + i); if (el) ui.names[i] = el.value; }); ui.variant = t.dataset.k; renderWelcome(); },
+    'free-kind': (t) => { ui.mode = t.dataset.k; render(); },
     count: (t) => { ui.names.forEach((n, i) => { const el = $('name' + i); if (el) ui.names[i] = el.value; }); ui.count = +t.dataset.n; renderWelcome(); },
     new: () => { ui.confirmNew = true; renderTop(); },
     'new-cancel': () => { ui.confirmNew = false; renderTop(); },
@@ -3277,7 +3513,7 @@ body.is-client .top { margin-bottom: 8px; }
     if (mode === 'host') return;
     const pid = myPid();
     if (t.dataset.v !== undefined) dispatch({ type: ui.mode === 'city' ? 'placeCity' : 'placeSettlement', player: pid, vertex: +t.dataset.v });
-    else if (t.dataset.e !== undefined) dispatch({ type: 'placeRoad', player: pid, edge: +t.dataset.e });
+    else if (t.dataset.e !== undefined) dispatch({ type: t.dataset.k === 'ship' ? 'placeShip' : 'placeRoad', player: pid, edge: +t.dataset.e });
     else if (t.dataset.h !== undefined) dispatch({ type: 'moveRobber', player: pid, hex: +t.dataset.h });
   }
 

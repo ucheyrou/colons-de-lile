@@ -203,6 +203,10 @@ h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
 @keyframes glow { 50% { stroke-opacity: .4; } }
 @media (prefers-reduced-motion: reduce) { .tgt, .tgt-e, .cube-box .cube, .cube-box .cube-shadow, .dice .sum { animation: none !important; } }
 .piece { stroke: #1b1b1b; stroke-width: 3; stroke-linejoin: round; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .4)); }
+/* Variante Archipel : cases de mer, bateaux, arêtes marines surlignées en tirets. */
+.sea-hex { fill: url(#waves); stroke: var(--sea-edge); stroke-width: 3; stroke-linejoin: round; }
+.ship { stroke: #1b1b1b; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .35)); }
+.tgt-e.ship { stroke-dasharray: 2 34; stroke-width: 22; }
 
 /* ---------- Joueurs et scores ---------- */
 .scores { padding: 12px; }
@@ -255,6 +259,7 @@ h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
 .dev .nm small { display: block; color: var(--muted); font-weight: 500; font-size: 12px; }
 .dev .cnt { font: 800 16px var(--f-display); min-width: 22px; text-align: center; }
 .builds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.builds.five > :last-child { grid-column: 1 / -1; }
 .build { text-align: left; flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 12px; min-height: 56px; }
 .build .cost { display: flex; gap: 1px; flex-wrap: wrap; min-height: 16px; }
 .build[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
@@ -456,6 +461,16 @@ h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
 .mode-card b { font: 800 18px var(--f-display); }
 .mode-card span { color: var(--muted); font-size: 14px; }
 .mode-card:hover { border-color: var(--accent); background: var(--surface); }
+.variants { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.variant {
+  display: grid; gap: 4px; align-content: start; text-align: left; min-height: 44px; padding: 12px 14px; border-radius: 12px;
+  border: 2px solid var(--line); background: var(--surface-2); color: var(--ink); font: inherit; cursor: pointer;
+}
+.variant b { font: 800 17px var(--f-display); }
+.variant span { color: var(--muted); font-size: 13px; }
+.variant[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.variant:hover { border-color: var(--accent); }
+@media (max-width: 420px) { .variants { grid-template-columns: 1fr; } }
 .mode-card.resume { border-color: var(--accent); background: var(--accent-soft); }
 .back { justify-self: start; }
 .field { display: grid; gap: 6px; }

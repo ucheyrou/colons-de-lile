@@ -32,7 +32,11 @@ export function botStep(s, rnd) {
   else if (av.setupRoad) go({ type: 'placeRoad', player: pid, edge: pick(av.targets.edges, rnd) });
   else if (av.moveRobber) go({ type: 'moveRobber', player: pid, hex: pick(av.targets.hexes, rnd) });
   else if (av.steal) go({ type: 'steal', player: pid, victim: pick(av.steal, rnd) });
-  else if (av.freeRoad) go({ type: 'placeRoad', player: pid, edge: pick(av.targets.edges, rnd) });
+  else if (av.freeRoad) {
+    const ship = av.freeShip && (av.targets.edgeKind === 'ship' || rnd() < 0.5);
+    const edges = ship ? E.targetsFor(s, pid, 'ship').edges : av.targets.edges;
+    go({ type: ship ? 'placeShip' : 'placeRoad', player: pid, edge: pick(edges, rnd) });
+  }
   else if (av.roll) {
     if (av.dev.knight && rnd() < 0.3) go({ type: 'playKnight', player: pid });
     else go({ type: 'roll', player: pid });
@@ -49,6 +53,7 @@ export function botStep(s, rnd) {
       go({ type: 'playYearOfPlenty', player: pid, a, b: pick(E.RES.filter((r) => left[r] > 0), rnd) });
     }
     else if (av.dev.monopoly && rnd() < 0.5) go({ type: 'playMonopoly', player: pid, res: pick(E.RES, rnd) });
+    else if (av.ship && rnd() < 0.5) go({ type: 'placeShip', player: pid, edge: pick(E.targetsFor(s, pid, 'ship').edges, rnd) });
     else if (av.road && rnd() < 0.5) go({ type: 'placeRoad', player: pid, edge: pick(E.targetsFor(s, pid, 'road').edges, rnd) });
     else {
       const giveable = E.RES.filter((r) => p.hand[r] >= av.ratios[r]);

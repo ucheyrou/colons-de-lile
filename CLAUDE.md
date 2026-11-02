@@ -35,7 +35,8 @@ Règles d'or :
 node --test test/*.test.mjs           # tests moteur
 node build.mjs               # génère dist/index.html
 node test/simulate.mjs 200   # 200 parties aléatoires, vérifie les invariants
-node test/e2e.mjs            # écran + 3 téléphones en jsdom (jsdom requis : npm i --no-save jsdom) ; ajouter --site pour un vrai courtier
+node test/simulate.mjs 200 sea  # idem sur l'archipel
+node test/e2e.mjs            # écran + 3 téléphones en jsdom (jsdom requis : npm i --no-save jsdom) ; --site pour un vrai courtier, --sea pour l'archipel
 node test/mqtt-live.mjs      # client MQTT contre les courtiers publics (réseau)
 node test/net-live.mjs       # hôte + 2 téléphones chiffrés par Internet
 node test/fx.mjs             # animation du lancer (jsdom)
@@ -113,6 +114,10 @@ Un agent qui découvre un bug dans le fichier d'un autre le signale (message ou 
 - Le plateau n'est jamais transmis : `E.boardFromSeed(seed)`. Une vue = `E.viewFor(état, siège, {board:false, log:14})`.
 - Tester avec `test/fake-room.mjs` (salon en mémoire) : `node --test test/net.test.mjs`.
 - Capacité à déclarer à la publication : `room` avec `topics: {a: "interact"}`.
+
+## Variante Archipel
+- Choix du plateau (`ui.variant`) sur l'écran qui lance la partie : écran du plateau (salon) ou partie sur un seul écran. Les téléphones reconstruisent le plateau avec `E.boardFromSeed(seed, variant)`.
+- Règles dans `RULES.md`, tests dans `test/sea.test.mjs`. Les sauvegardes d'avant la variante n'ont ni `variant`, ni `ships`, ni `discover` : le moteur les traite comme une partie classique.
 
 ## Pièges connus
 - Sommets/arêtes : identifiés par position arrondie à 1e-3 sur un hexagone de rayon 1 ; ne pas changer la formule des coins sans relancer les tests.

@@ -12,6 +12,7 @@
     knight: 'Déplace le voleur et vole une carte.',
     vp: 'Compte 1 point, reste caché.',
     roadBuilding: 'Pose 2 routes gratuites.',
+    roadBuildingSea: 'Pose 2 routes ou bateaux gratuits.',
     yearOfPlenty: 'Prends 2 cartes de ton choix à la banque.',
     monopoly: 'Tous les autres te donnent une ressource choisie.',
   };
@@ -42,7 +43,7 @@
   const ui = {
     screen: 'menu', pin: null, mode: null, tradeOpen: false, tab: 'bank', bankGive: null, bankGet: null,
     give: zero(), want: zero(), discard: zero(), pick: null, yop: [], toast: '', confirmNew: false,
-    count: 3, names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: null, diceAt: 0, orderSeen: null, stageTimer: 0, pieces: null, news: [], newsNow: [], newsTimer: 0, lastTurn: -1, fxKey: null, fx: null, fxNow: null, fxTimer: 0, gain: null, gainTimer: 0, lastHand: null,
+    count: 3, variant: 'classic', names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: null, diceAt: 0, orderSeen: null, stageTimer: 0, pieces: null, news: [], newsNow: [], newsTimer: 0, lastTurn: -1, fxKey: null, fx: null, fxNow: null, fxTimer: 0, gain: null, gainTimer: 0, lastHand: null,
     code: '', joinCode: '', myName: '', error: '', busy: false,
     seat: -1, boardSeed: null, board: null, conn: 'searching', lobby: [], pending: 0, phoneTab: 'hand', needBoard: false, wasNeed: false, wasMine: false,
   };
@@ -55,7 +56,7 @@
     del(k) { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } },
   };
   const slim = (g) => Object.assign({}, g, { board: undefined });
-  const fat = (g) => { if (g && !g.board) g.board = E.boardFromSeed(g.seed); return g; };
+  const fat = (g) => { if (g && !g.board) g.board = E.boardFromSeed(g.seed, g.variant); return g; };
   const validGame = (g) => g && g.players && (g.board || g.seed != null);
   function save() {
     if (mode === 'local') store.set(SAVE_KEY, slim(game));
@@ -90,7 +91,7 @@
   }
   // Actions que le téléphone peut montrer tout de suite : elles ne dépendent d'aucun secret (dés, pioche, main des autres).
   // L'hôte tranche ; sa vue remplace de toute façon l'affichage anticipé.
-  const ANTICIPATED = new Set(['pickColor', 'placeSettlement', 'placeRoad', 'placeCity', 'endTurn', 'bankTrade', 'discard', 'offerTrade', 'cancelTrade', 'respondTrade']);
+  const ANTICIPATED = new Set(['pickColor', 'placeSettlement', 'placeRoad', 'placeShip', 'placeCity', 'endTurn', 'bankTrade', 'discard', 'offerTrade', 'cancelTrade', 'respondTrade']);
   function anticipate(action) {
     if (!ANTICIPATED.has(action.type)) return;
     try {
@@ -127,26 +128,20 @@
     let tg = av.targets;
     if (ui.mode && av.myTurn) tg = Object.assign({ vertices: [], edges: [], hexes: [] }, E.targetsFor(s, pid, ui.mode));
     tg = Object.assign({ vertices: [], edges: [], hexes: [] }, tg);
+    const edgeKind = tg.edgeKind || 'road';
     ui.needBoard = !!(tg.vertices.length || tg.edges.length || tg.hexes.length);
     const out = [];
-    out.push('<ellipse cx="0" cy="0" rx="530" ry="490" fill="var(--sea)" stroke="var(--sea-edge)" stroke-width="6"/><ellipse cx="0" cy="0" rx="530" ry="490" fill="url(#waves)"/><ellipse cx="0" cy="0" rx="530" ry="490" fill="url(#seagrad)"/>');
-
-    b.ports.forEach((p) => {
-      const bx = X(p.x + p.nx * 0.62), by = X(p.y + p.ny * 0.62);
-      [p.a, p.b].forEach((v) => {
-        out.push('<line x1="' + bx + '" y1="' + by + '" x2="' + X(b.vertices[v].x) + '" y2="' + X(b.vertices[v].y) + '" stroke="var(--pier)" stroke-width="7" stroke-linecap="round"/>');
-      });
-      const generic = p.type === 'any';
-      out.push('<g transform="translate(' + bx + ' ' + by + ')"><circle r="29" fill="var(--surface)" stroke="var(--pier)" stroke-width="4"/>' +
-        (generic
-          ? '<text y="7" text-anchor="middle" font-size="19" font-weight="800" fill="var(--ink)" font-family="var(--f-display)">3:1</text>'
-          : '<use href="#g-' + p.type + '" x="-13" y="-25" width="26" height="26"/><text y="20" text-anchor="middle" font-size="14" font-weight="800" fill="var(--ink)" font-family="var(--f-display)">2:1</text>') +
-        '</g>');
-    });
+    if (s.variant === 'sea') {
+      const vb = boardBox(b);
+      out.push('<rect x="' + vb.x + '" y="' + vb.y + '" width="' + vb.w + '" height="' + vb.h + '" fill="url(#seagrad)"/>');
+    } else {
+      out.push('<ellipse cx="0" cy="0" rx="530" ry="490" fill="var(--sea)" stroke="var(--sea-edge)" stroke-width="6"/><ellipse cx="0" cy="0" rx="530" ry="490" fill="url(#waves)"/><ellipse cx="0" cy="0" rx="530" ry="490" fill="url(#seagrad)"/>');
+    }
 
     const hexMarkup = (h) => {
       const out = [];
       const pts = h.vertices.map((v) => X(b.vertices[v].x) + ',' + X(b.vertices[v].y)).join(' ');
+      if (h.terrain === 'sea') return '<polygon class="sea-hex" points="' + pts + '"/>';
       const cx = X(h.x), cy = X(h.y);
       const g = GLYPH[h.terrain];
       const flip = (h.id * 7 + h.q * 3 + h.r) % 2 ? ' scale(-1 1)' : '';
@@ -167,7 +162,15 @@
       }
       return out.join('');
     };
-    b.hexes.forEach((h) => out.push('<g class="bh">' + hexMarkup(h) + '</g>'));
+    // La mer d'abord, pour que les ports et la côte passent par-dessus.
+    b.hexes.filter((h) => h.terrain === 'sea').forEach((h) => out.push(hexMarkup(h)));
+    out.push(portsHTML(b));
+    b.hexes.filter((h) => h.terrain !== 'sea').forEach((h) => out.push('<g class="bh">' + hexMarkup(h) + '</g>'));
+
+    Object.keys(s.ships || {}).forEach((k) => {
+      const m = edgeMid(b, +k), fresh = newsAt('ship', +k);
+      out.push('<g transform="translate(' + X(m.x) + ' ' + X(m.y) + ')">' + (fresh ? '<g class="drop" style="--el:-' + fresh.elapsed + 'ms">' + shipSvg(s.ships[k]) + '</g>' : shipSvg(s.ships[k])) + '</g>');
+    });
 
     Object.keys(s.roads).forEach((k) => {
       const e = b.edges[+k], A = b.vertices[e.a], B = b.vertices[e.b];
@@ -195,11 +198,11 @@
     tg.edges.forEach((id) => {
       const e = b.edges[id], A = b.vertices[e.a], B = b.vertices[e.b];
       const c = ' x1="' + X(A.x + (B.x - A.x) * 0.16) + '" y1="' + X(A.y + (B.y - A.y) * 0.16) + '" x2="' + X(A.x + (B.x - A.x) * 0.84) + '" y2="' + X(A.y + (B.y - A.y) * 0.84) + '"';
-      out.push('<line class="tgt-e"' + c + '/><line class="hit hit-e" data-e="' + id + '"' + c + '/>');
+      out.push('<line class="tgt-e' + (edgeKind === 'ship' ? ' ship' : '') + '"' + c + '/><line class="hit hit-e" data-e="' + id + '" data-k="' + edgeKind + '"' + c + '/>');
     });
 
     ui.newsNow.forEach((n) => {
-      const at = n.kind === 'road' ? edgeMid(b, n.at) : b.vertices[n.at];
+      const at = onEdge(n.kind) ? edgeMid(b, n.at) : b.vertices[n.at];
       out.push('<circle class="fx-new" cx="' + X(at.x) + '" cy="' + X(at.y) + '" r="34" stroke="' + pcolor(n.owner) + '" style="--el:-' + n.elapsed + 'ms"/>');
     });
 
@@ -230,6 +233,38 @@
     return out.join('');
   }
 
+  function portsHTML(b) {
+    return b.ports.map((p) => {
+      const bx = X(p.x + p.nx * 0.62), by = X(p.y + p.ny * 0.62);
+      const piers = [p.a, p.b].map((v) => '<line x1="' + bx + '" y1="' + by + '" x2="' + X(b.vertices[v].x) + '" y2="' + X(b.vertices[v].y) + '" stroke="var(--pier)" stroke-width="7" stroke-linecap="round"/>').join('');
+      const generic = p.type === 'any';
+      return piers + '<g transform="translate(' + bx + ' ' + by + ')"><circle r="29" fill="var(--surface)" stroke="var(--pier)" stroke-width="4"/>' +
+        (generic
+          ? '<text y="7" text-anchor="middle" font-size="19" font-weight="800" fill="var(--ink)" font-family="var(--f-display)">3:1</text>'
+          : '<use href="#g-' + p.type + '" x="-13" y="-25" width="26" height="26"/><text y="20" text-anchor="middle" font-size="14" font-weight="800" fill="var(--ink)" font-family="var(--f-display)">2:1</text>') +
+        '</g>';
+    }).join('');
+  }
+  // Bateau dessiné droit au milieu de l'arête : coque et grand-voile à la couleur du joueur.
+  const shipSvg = (owner) => '<g class="ship" fill="' + pcolor(owner) + '"><path d="M-25 4H25L16 17H-16Z"/><path d="M1-30V4" fill="none"/><path d="M4-28 22 0H4Z"/><path d="M-3-22-18 0H-3Z" fill="#fffaf0"/></g>';
+  // Cadre du plateau marin : les cases et les ports, avec une petite marge.
+  const boxes = new WeakMap();
+  function boardBox(b) {
+    if (boxes.has(b)) return boxes.get(b);
+    const xs = [], ys = [];
+    b.vertices.forEach((v) => { xs.push(X(v.x)); ys.push(X(v.y)); });
+    b.ports.forEach((p) => { xs.push(X(p.x + p.nx * 0.62) + 34, X(p.x + p.nx * 0.62) - 34); ys.push(X(p.y + p.ny * 0.62) + 34, X(p.y + p.ny * 0.62) - 34); });
+    const x = Math.min(...xs) - 24, y = Math.min(...ys) - 24;
+    const box = { x, y, w: Math.max(...xs) + 24 - x, h: Math.max(...ys) + 24 - y };
+    boxes.set(b, box);
+    return box;
+  }
+  function viewBoxOf(b) {
+    if (game.variant !== 'sea') return '-560 -520 1120 1040';
+    const box = boardBox(b);
+    return [box.x, box.y, box.w, box.h].join(' ');
+  }
+
   function resetFx() { ui.fxKey = null; ui.fx = null; ui.fxNow = null; ui.gain = null; ui.lastHand = null; ui.orderSeen = null; ui.diceKey = null; ui.pieces = null; ui.news = []; }
 
   // ---------- Annonce des constructions, façon écran de bowling : on compare les pièces au rendu précédent ----------
@@ -237,15 +272,17 @@
   const PIECE_PATH = { settlement: 'M-11 10V-2L0-13 11-2V10Z', city: 'M-15 10V-2H-6V-12L2-19 10-12V-2H15V10Z' };
   const NEWS = {
     road: { word: 'ROUTE !', text: 'pose une route' },
+    ship: { word: 'À L\'EAU !', text: 'met un bateau à l\'eau' },
     settlement: { word: 'COLONIE !', text: 'construit une colonie', pts: 1 },
     city: { word: 'VILLE !', text: 'construit une ville', pts: 1 },
   };
   const CONFETTI = ['var(--pc)', '#ffd34d', '#ffffff', '#5fd0e0', 'var(--pc)', '#ff7a59'];
-  const newsAt = (kind, at) => ui.newsNow.find((n) => (kind === 'road') === (n.kind === 'road') && n.at === at);
+  const onEdge = (kind) => kind === 'road' || kind === 'ship';
+  const newsAt = (kind, at) => ui.newsNow.find((n) => onEdge(kind) === onEdge(n.kind) && n.at === at);
   const edgeMid = (b, id) => { const e = b.edges[id]; return { x: (b.vertices[e.a].x + b.vertices[e.b].x) / 2, y: (b.vertices[e.a].y + b.vertices[e.b].y) / 2 }; };
   function trackBuilds() {
     const s = game;
-    const now = { roads: Object.assign({}, s.roads), buildings: {} };
+    const now = { roads: Object.assign({}, s.roads), ships: Object.assign({}, s.ships), buildings: {} };
     Object.keys(s.buildings).forEach((k) => { now.buildings[k] = s.buildings[k].type; });
     const prev = ui.pieces;
     ui.pieces = now;
@@ -253,6 +290,7 @@
     const t = Date.now();
     const added = [];
     Object.keys(now.roads).forEach((k) => { if (prev.roads[k] === undefined) added.push({ kind: 'road', at: +k, owner: now.roads[k], t }); });
+    Object.keys(now.ships).forEach((k) => { if (prev.ships[k] === undefined) added.push({ kind: 'ship', at: +k, owner: now.ships[k], t }); });
     Object.keys(now.buildings).forEach((k) => {
       if (now.buildings[k] !== prev.buildings[k]) added.push({ kind: now.buildings[k], at: +k, owner: s.buildings[k].owner, t });
     });
@@ -270,7 +308,8 @@
     const c = pcolor(owner);
     const shape = kind === 'road'
       ? '<line x1="-13" y1="5" x2="13" y2="-7" stroke="#1b1b1b" stroke-width="9" stroke-linecap="round"/><line x1="-13" y1="5" x2="13" y2="-7" stroke="' + c + '" stroke-width="5" stroke-linecap="round"/>'
-      : '<path class="piece" d="' + PIECE_PATH[kind] + '" fill="' + c + '"/>';
+      : kind === 'ship' ? '<g transform="translate(0 -2) scale(.55)">' + shipSvg(owner) + '</g>'
+        : '<path class="piece" d="' + PIECE_PATH[kind] + '" fill="' + c + '"/>';
     return '<svg class="bowl-piece" viewBox="-18 -21 36 33" aria-hidden="true">' + shape + '</svg>';
   }
   // Positions des confettis fixes par indice : un nouveau rendu en pleine animation ne les déplace pas.
@@ -287,8 +326,8 @@
     if (n) {
       const info = NEWS[n.kind];
       const letters = Array.from(info.word).map((ch, i) => '<span style="--i:' + i + '">' + (ch === ' ' ? '&nbsp;' : esc(ch)) + '</span>').join('');
-      html = '<div class="bowl' + (n.kind === 'road' ? ' small' : '') + '" style="--pc:' + pcolor(n.owner) + ';--el:-' + n.elapsed + 'ms"><div class="bowl-in">' +
-        '<div class="bowl-rays"></div><div class="bowl-confetti">' + confettiHTML(n.kind === 'road' ? 10 : 22) + '</div>' +
+      html = '<div class="bowl' + (onEdge(n.kind) ? ' small' : '') + '" style="--pc:' + pcolor(n.owner) + ';--el:-' + n.elapsed + 'ms"><div class="bowl-in">' +
+        '<div class="bowl-rays"></div><div class="bowl-confetti">' + confettiHTML(onEdge(n.kind) ? 10 : 22) + '</div>' +
         pieceIcon(n.kind, n.owner) + '<div class="bowl-word" aria-hidden="true">' + letters + '</div>' +
         '<div class="bowl-who"><span class="dot"></span><span><b>' + esc(game.players[n.owner].name) + '</b> ' + info.text + '</span></div>' +
         (info.pts ? '<div class="bowl-stamp">+' + info.pts + ' pt</div>' : '') + '</div></div>';
@@ -440,14 +479,17 @@
       const badges = (s.phase === 'order' && s.order.rolls[i].length ? '<span class="badge">Dé : ' + rollsText(s, i) + '</span>' : '') +
         (s.longestRoad.holder === i ? '<span class="badge">Plus longue route</span>' : '') +
         (s.largestArmy.holder === i ? '<span class="badge">Plus grande armée</span>' : '') +
+        (E.discoveriesOf(s, i) ? '<span class="badge">Îlot' + (E.discoveriesOf(s, i) > 1 ? 's' : '') + ' découvert' + (E.discoveriesOf(s, i) > 1 ? 's' : '') + ' : ' + E.discoveriesOf(s, i) + '</span>' : '') +
         (mode === 'host' && !on.has(i) ? '<span class="badge off">Hors ligne</span>' : '');
       const tag = mode === 'local' && i === v ? ' <small>(affiché)</small>' : (mode === 'client' && i === v ? ' <small>(toi)</small>' : '');
       return '<li class="pl' + (i === s.turn && s.phase !== 'ended' ? ' turn' : '') + '" style="--pc:' + pcolor(i) + '">' +
         '<span class="dot"></span><b>' + esc(p.name) + tag + '</b><span class="pts" title="Points visibles">' + E.points(s, i, false) + '</span>' +
         '<span class="meta"><span>' + cardsOf(p) + ' cartes</span><span>' + devOf(p) + ' dév.</span><span>' + p.knights + ' chevalier' + (p.knights > 1 ? 's' : '') + '</span><span>route ' + (p.roadLen || 0) + '</span>' + badges + '</span></li>';
     }).join('');
-    return '<h2>Joueurs · objectif ' + E.WIN_POINTS + ' points</h2><ul class="players">' + rows + '</ul>' +
-      '<div class="bank"><b>Pioche</b><span>' + deckOf(s) + ' cartes de développement</span></div>';
+    const islets = s.variant === 'sea' ? 3 - Object.keys(s.discover).length : 0;
+    return '<h2>Joueurs · objectif ' + E.goalOf(s) + ' points</h2><ul class="players">' + rows + '</ul>' +
+      '<div class="bank"><b>Pioche</b><span>' + deckOf(s) + ' cartes de développement</span></div>' +
+      (islets ? '<div class="bank"><b>Îlots</b><span>' + islets + ' à découvrir · ' + E.DISCOVERY_POINTS + ' points au premier colon</span></div>' : '');
   }
 
   // ---------- Main du joueur ----------
@@ -475,7 +517,11 @@
     }
     if (s.step === 'robber') return s.turn === v ? { t: 'Déplace le voleur : touche un hexagone.', go: true } : { t: turnName + ' déplace le voleur.', go: false };
     if (s.step === 'steal') return s.turn === v ? { t: 'Choisis à qui voler une carte.', go: true } : { t: turnName + ' choisit sa victime.', go: false };
-    if (s.step === 'roadBuilding') return s.turn === v ? { t: 'Pose encore ' + s.freeRoads + ' route' + (s.freeRoads > 1 ? 's' : '') + ' gratuite' + (s.freeRoads > 1 ? 's' : '') + '.', go: true } : { t: turnName + ' pose des routes.', go: false };
+    if (s.step === 'roadBuilding') {
+      const n = s.freeRoads, pl = n > 1 ? 's' : '';
+      if (s.turn !== v) return { t: turnName + ' pose des ' + (s.variant === 'sea' ? 'routes ou des bateaux.' : 'routes.'), go: false };
+      return { t: 'Pose encore ' + n + (s.variant === 'sea' ? ' route' + pl + ' ou bateau' + (n > 1 ? 'x' : '') + ' gratuit' + pl : ' route' + pl + ' gratuite' + pl) + '.', go: true };
+    }
     if (s.turn !== v) return { t: 'Au tour de ' + turnName + '.', go: false };
     if (s.step === 'roll') return { t: 'À toi de jouer : lance les dés.', go: true };
     if (ui.mode) return { t: 'Touche un emplacement lumineux sur le plateau.', go: true };
@@ -592,6 +638,11 @@
         '<button class="btn" data-act="step" data-set="discard" data-r="' + r + '" data-d="1"' + (ui.discard[r] < me.hand[r] && n < av.discard ? '' : ' disabled') + '>+</button></div>').join('') +
         '</div><button class="btn primary" data-act="discard"' + (n === av.discard ? '' : ' disabled') + '>Défausser</button></div>';
     }
+    if (av.freeRoad && av.freeShip) {
+      const kind = ui.mode || av.targets.edgeKind;
+      html += '<div class="section-title">Pièce gratuite</div><div class="seg" role="group">' + [['road', 'Route'], ['ship', 'Bateau']].map(([k, label]) =>
+        '<button class="btn" data-act="free-kind" data-k="' + k + '" aria-pressed="' + (kind === k) + '">' + label + '</button>').join('') + '</div>';
+    }
     if (av.steal) {
       html += '<div class="row">' + av.steal.map((i) => '<button class="btn" data-act="steal" data-i="' + i + '"><span class="dot" style="--pc:' + pcolor(i) + '"></span>Voler à ' + esc(s.players[i].name) + '</button>').join('') + '</div>';
     }
@@ -607,7 +658,8 @@
       html += '<div class="section-title">Cartes de développement</div><div class="devs">' + kindKeys.map((k) => {
         const info = kinds[k];
         const playable = k !== 'vp' && av.dev[k];
-        const note = k === 'vp' ? DEV_HELP.vp : (info.ready < info.n ? 'Achetée ce tour, jouable au prochain. ' : '') + DEV_HELP[k];
+        const help = k === 'roadBuilding' && s.variant === 'sea' ? DEV_HELP.roadBuildingSea : DEV_HELP[k];
+        const note = k === 'vp' ? help : (info.ready < info.n ? 'Achetée ce tour, jouable au prochain. ' : '') + help;
         return '<div class="dev"><span class="cnt">' + info.n + '</span><span class="nm">' + E.DEV_FR[k] + '<small>' + note + '</small></span>' +
           (k === 'vp' ? '' : '<button class="btn small" data-act="dev" data-k="' + k + '"' + (playable ? '' : ' disabled') + '>Jouer</button>') + '</div>';
       }).join('') + '</div>';
@@ -622,9 +674,9 @@
 
     if (av.myTurn && s.phase === 'main' && s.step === 'actions') {
       const b = (k, label, cost, on) => '<button class="btn build" data-act="mode" data-k="' + k + '" aria-pressed="' + (ui.mode === k) + '"' + (on ? '' : ' disabled') + '><span>' + label + '</span><span class="cost">' + costIcons(cost) + '</span></button>';
-      html += '<div class="section-title">Construire</div><div class="builds">' +
-        b('road', 'Route', E.COST.road, av.road) + b('settlement', 'Colonie', E.COST.settlement, av.settlement) +
-        b('city', 'Ville', E.COST.city, av.city) +
+      html += '<div class="section-title">Construire</div><div class="builds' + (s.variant === 'sea' ? ' five' : '') + '">' +
+        b('road', 'Route', E.COST.road, av.road) + (s.variant === 'sea' ? b('ship', 'Bateau', E.COST.ship, av.ship) : '') +
+        b('settlement', 'Colonie', E.COST.settlement, av.settlement) + b('city', 'Ville', E.COST.city, av.city) +
         '<button class="btn build" data-act="buy"' + (av.buyDev ? '' : ' disabled') + '><span>Carte dév.</span><span class="cost">' + costIcons(E.COST.dev) + '</span></button></div>';
       if (ui.mode) html += '<button class="btn small" data-act="mode" data-k="' + ui.mode + '">Annuler la construction</button>';
       html += '<button class="btn" data-act="trade-toggle" aria-expanded="' + ui.tradeOpen + '">' + (ui.tradeOpen ? 'Fermer le commerce' : 'Commerce') + '</button>';
@@ -683,15 +735,25 @@
     const savedHost = store.get(HOST_KEY);
     let html = '<h2>Une île, cinq ressources, dix points</h2><p>Construis des routes, des colonies et des villes. Le premier à ' + E.WIN_POINTS + ' points gagne.</p><div class="modes">';
     if (savedHost && savedHost.game && savedHost.game.phase !== 'ended') {
-      html += '<button class="mode-card resume" data-act="host-resume"><b>Reprendre la partie en ligne</b><span>Salle ' + esc(savedHost.code) + ' · ' + savedHost.game.players.map((p) => esc(p.name)).join(', ') + '</span></button>';
+      html += '<button class="mode-card resume" data-act="host-resume"><b>Reprendre la partie en ligne</b><span>Salle ' + esc(savedHost.code) + (savedHost.game.variant === 'sea' ? ' · Archipel' : '') + ' · ' + savedHost.game.players.map((p) => esc(p.name)).join(', ') + '</span></button>';
     }
     if (saved && saved.players && saved.phase !== 'ended') {
-      html += '<button class="mode-card resume" data-act="resume"><b>Reprendre la partie sur un écran</b><span>' + saved.players.map((p) => esc(p.name)).join(', ') + '</span></button>';
+      html += '<button class="mode-card resume" data-act="resume"><b>Reprendre la partie sur un écran</b><span>' + (saved.variant === 'sea' ? 'Archipel · ' : '') + saved.players.map((p) => esc(p.name)).join(', ') + '</span></button>';
     }
     html += '<button class="mode-card" data-act="goto" data-s="host"><b>Plateau sur cet écran</b><span>Ordinateur ou télé. Chaque joueur voit sa main sur son téléphone.</span></button>' +
       '<button class="mode-card" data-act="goto" data-s="join"><b>Rejoindre depuis mon téléphone</b><span>Entre le code affiché sur l\'écran du plateau.</span></button>' +
       '<button class="mode-card" data-act="goto" data-s="setup"><b>Un seul écran pour tous</b><span>On se passe l\'appareil, sans téléphones.</span></button></div>';
     return html;
+  }
+
+  // Choix du plateau, sur l'écran qui lance la partie.
+  function variantHTML() {
+    const opts = [
+      ['classic', 'Classique', 'Une île, des routes. Victoire à ' + E.WIN_POINTS + ' points.'],
+      ['sea', 'Archipel', 'Une île et trois îlots au large : bateaux, ' + E.DISCOVERY_POINTS + ' points au premier colon de chaque îlot. Victoire à ' + E.SEA_WIN_POINTS + ' points.'],
+    ];
+    return '<div><div class="section-title">Plateau</div><div class="variants" role="group" aria-label="Plateau">' + opts.map(([k, title, text]) =>
+      '<button class="variant" data-act="variant" data-k="' + k + '" aria-pressed="' + (ui.variant === k) + '"><b>' + title + '</b><span>' + text + '</span></button>').join('') + '</div></div>';
   }
 
   function setupHTML() {
@@ -701,6 +763,7 @@
       '<div class="names">' + Array.from({ length: ui.count }, (_, i) =>
         '<label class="name-row"><span class="sr">Nom du joueur ' + (i + 1) + '</span>' +
         '<input id="name' + i + '" type="text" maxlength="14" value="' + esc(ui.names[i]) + '" autocomplete="off"></label>').join('') + '</div>' +
+      variantHTML() +
       '<p class="note">Chacun choisit sa couleur au début de la partie.</p>' +
       '<button class="btn primary big" data-act="start">Lancer la partie</button>';
   }
@@ -716,7 +779,7 @@
     html += '<div><div class="section-title">Joueurs connectés (' + players.length + '/4)</div><ul class="players">' + (players.length ? players.slice(0, 4).map((p, i) =>
       '<li class="pl"><span class="dot"></span><b>' + esc(p.name) + '</b></li>').join('') : '<li class="pl empty">En attente des téléphones…</li>') + '</ul>' +
       (players.length > 4 ? '<p class="note">Seuls les 4 premiers arrivés joueront.</p>' : '') + '</div>';
-    html += '<button class="btn primary big" data-act="host-start"' + (players.length >= 2 ? '' : ' disabled') + '>Lancer la partie</button>' +
+    html += variantHTML() + '<button class="btn primary big" data-act="host-start"' + (players.length >= 2 ? '' : ' disabled') + '>Lancer la partie</button>' +
       (inArtifact() ? '<p class="note">Les joueurs doivent avoir accès à l\'artefact (partage avec droit de contribution). Ne republie pas la page pendant une partie : cela déconnecte tout le monde.</p>' : '<p class="note">Aucun compte à créer. Les échanges entre appareils sont chiffrés : le serveur de salle ne voit passer que des messages illisibles.</p>');
     return html;
   }
@@ -793,6 +856,7 @@
     trackOrder();
     ui.fxNow = activeFx();
     ui.newsNow = activeNews();
+    $('board').setAttribute('viewBox', viewBoxOf(game.board));
     $('board').innerHTML = boardHTML();
     $('board').setAttribute('class', ui.fxNow ? 'fx-on' : '');
     if (ui.fxNow) $('board').style.setProperty('--el', '-' + ui.fxNow.elapsed + 'ms');
@@ -830,7 +894,7 @@
       ui.names[i] = v;
       names.push(v);
     }
-    game = E.newGame({ names, seed: newSeed() });
+    game = E.newGame({ names, seed: newSeed(), variant: ui.variant });
     mode = 'local';
     resetFx();
     ui.pin = null; ui.mode = null; ui.lastTurn = -1; ui.tradeOpen = false; ui.confirmNew = false;
@@ -894,7 +958,7 @@
   function hostStart() {
     const players = hostNet.lobby().slice(0, 4);
     if (players.length < 2) return;
-    game = E.newGame({ names: players.map((p) => p.name), seed: newSeed() });
+    game = E.newGame({ names: players.map((p) => p.name), seed: newSeed(), variant: ui.variant });
     const seats = {};
     players.forEach((p, i) => { seats[p.pub] = i; });
     hostNet.setSeats(seats);
@@ -961,7 +1025,8 @@
   function onPhoneView(p) {
     if (!game) resetFx();
     const view = p.view;
-    if (ui.boardSeed !== view.seed || !ui.board) { ui.board = E.boardFromSeed(view.seed); ui.boardSeed = view.seed; }
+    const key = view.seed + ':' + view.variant;
+    if (ui.boardSeed !== key || !ui.board) { ui.board = E.boardFromSeed(view.seed, view.variant); ui.boardSeed = key; }
     view.board = ui.board;
     game = view;
     ui.seat = p.seat;
@@ -985,6 +1050,8 @@
     leave: leaveGame,
     start: startLocal,
     resume: () => { const g = store.get(SAVE_KEY); if (validGame(g)) { game = fat(g); mode = 'local'; resetFx(); ui.lastTurn = -1; render(); } },
+    variant: (t) => { ui.names.forEach((n, i) => { const el = $('name' + i); if (el) ui.names[i] = el.value; }); ui.variant = t.dataset.k; renderWelcome(); },
+    'free-kind': (t) => { ui.mode = t.dataset.k; render(); },
     count: (t) => { ui.names.forEach((n, i) => { const el = $('name' + i); if (el) ui.names[i] = el.value; }); ui.count = +t.dataset.n; renderWelcome(); },
     new: () => { ui.confirmNew = true; renderTop(); },
     'new-cancel': () => { ui.confirmNew = false; renderTop(); },
@@ -1037,7 +1104,7 @@
     if (mode === 'host') return;
     const pid = myPid();
     if (t.dataset.v !== undefined) dispatch({ type: ui.mode === 'city' ? 'placeCity' : 'placeSettlement', player: pid, vertex: +t.dataset.v });
-    else if (t.dataset.e !== undefined) dispatch({ type: 'placeRoad', player: pid, edge: +t.dataset.e });
+    else if (t.dataset.e !== undefined) dispatch({ type: t.dataset.k === 'ship' ? 'placeShip' : 'placeRoad', player: pid, edge: +t.dataset.e });
     else if (t.dataset.h !== undefined) dispatch({ type: 'moveRobber', player: pid, hex: +t.dataset.h });
   }
 

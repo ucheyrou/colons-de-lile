@@ -7,7 +7,7 @@
 
   const RES = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
   const RES_FR = { wood: 'bois', brick: 'argile', sheep: 'laine', wheat: 'blé', ore: 'minerai' };
-  const TERRAIN_RES = { forest: 'wood', hills: 'brick', pasture: 'sheep', fields: 'wheat', mountains: 'ore', desert: null };
+  const TERRAIN_RES = { forest: 'wood', hills: 'brick', pasture: 'sheep', fields: 'wheat', mountains: 'ore', desert: null, sea: null };
   const COLORS = ['red', 'blue', 'orange', 'white', 'green', 'purple'];
   const COLOR_FR = { red: 'rouge', blue: 'bleu', orange: 'orange', white: 'blanc', green: 'vert', purple: 'violet' };
   const COST = {
@@ -15,10 +15,15 @@
     settlement: { wood: 1, brick: 1, sheep: 1, wheat: 1 },
     city: { wheat: 2, ore: 3 },
     dev: { sheep: 1, wheat: 1, ore: 1 },
+    ship: { wood: 1, sheep: 1 },
   };
-  const LIMITS = { road: 15, settlement: 5, city: 4 };
+  const LIMITS = { road: 15, settlement: 5, city: 4, ship: 15 };
   const DEV_FR = { knight: 'Chevalier', vp: 'Point de victoire', roadBuilding: 'Construction de routes', yearOfPlenty: 'Invention', monopoly: 'Monopole' };
   const WIN_POINTS = 10;
+  // Variante « Archipel » : bateaux, îlots au large, 2 points au premier colon de chaque îlot, victoire à 12.
+  const VARIANTS = ['classic', 'sea'];
+  const SEA_WIN_POINTS = 12;
+  const DISCOVERY_POINTS = 2;
 
   class RuleError extends Error {}
   const need = (cond, msg) => { if (!cond) throw new RuleError(msg); };
@@ -97,21 +102,28 @@
     return outer.concat(inner, [[0, 0]]);
   }
 
-  function buildBoard(s) {
+  const hexDist = (q, r) => Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
+  function makeHexes(radius) {
     const coords = [];
-    for (let q = -2; q <= 2; q++) for (let r = -2; r <= 2; r++) if (Math.abs(q + r) <= 2) coords.push([q, r]);
-
-    const hexes = coords.map(([q, r], id) => ({
+    for (let q = -radius; q <= radius; q++) for (let r = -radius; r <= radius; r++) if (Math.abs(q + r) <= radius) coords.push([q, r]);
+    return coords.map(([q, r], id) => ({
       id, q, r,
       x: Math.sqrt(3) * (q + r / 2),
       y: 1.5 * r,
       terrain: null,
       number: null,
+      island: 0,
       vertices: [],
     }));
-    const hexAt = (q, r) => hexes.find((h) => h.q === q && h.r === r);
-    const hexNbrs = (h) => HEX_DIRS.map(([dq, dr]) => hexAt(h.q + dq, h.r + dr)).filter(Boolean);
-    const hot = (h) => h.number === 6 || h.number === 8;
+  }
+  const hexFinder = (hexes) => (q, r) => hexes.find((h) => h.q === q && h.r === r);
+  const nbrsIn = (hexAt) => (h) => HEX_DIRS.map(([dq, dr]) => hexAt(h.q + dq, h.r + dr)).filter(Boolean);
+  const hot = (h) => h.number === 6 || h.number === 8;
+
+  function buildBoard(s) {
+    const hexes = makeHexes(2);
+    const hexAt = hexFinder(hexes);
+    const hexNbrs = nbrsIn(hexAt);
 
     // Comme le vrai jeu : tuiles mélangées, puis jetons A à R posés en spirale
     // depuis un coin de la côte, vers l'intérieur, en sautant le désert.
@@ -130,7 +142,36 @@
       if (!hexes.some((h) => hot(h) && hexNbrs(h).some((n) => hot(n)))) break;
     }
 
-    // Sommets et arêtes dédupliqués par position.
+    const { vertices, edges } = linkHexes(hexes);
+
+    // Ports : 9 sur les 30 arêtes côtières, espacés 3-3-4.
+    const coast = edges
+      .filter((e) => e.hexes.length === 1)
+      .map((e) => {
+        const A = vertices[e.a], B = vertices[e.b];
+        const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
+        return { e, mx, my, ang: Math.atan2(my, mx) };
+      })
+      .sort((p, q) => p.ang - q.ang);
+    const types = shuffle(s, ['any', 'any', 'any', 'any', 'wood', 'brick', 'sheep', 'wheat', 'ore']);
+    const gaps = [0, 3, 6, 10, 13, 16, 20, 23, 26];
+    const ports = gaps.map((g, i) => makePort(hexes, vertices, coast[g % coast.length], types[i]));
+
+    return { hexes, vertices, edges, ports, spiral };
+  }
+
+  function makePort(hexes, vertices, c, type) {
+    const h = hexes[c.e.hexes.find((id) => hexes[id].terrain !== 'sea')];
+    const dx = c.mx - h.x, dy = c.my - h.y;
+    const len = Math.hypot(dx, dy);
+    vertices[c.e.a].port = type;
+    vertices[c.e.b].port = type;
+    return { edge: c.e.id, a: c.e.a, b: c.e.b, type, x: c.mx, y: c.my, nx: dx / len, ny: dy / len };
+  }
+
+  // Sommets et arêtes dédupliqués par position. Une arête « terre » touche une case de terre (route possible),
+  // une arête « mer » touche la mer ou le bord du plateau (bateau possible) ; la côte est les deux.
+  function linkHexes(hexes) {
     const vertices = [];
     const vIndex = new Map();
     const edges = [];
@@ -161,16 +202,69 @@
         edges[eIndex.get(key)].hexes.push(h.id);
       }
     });
+    const isSea = (id) => hexes[id].terrain === 'sea';
     edges.forEach((e) => {
       vertices[e.a].edges.push(e.id);
       vertices[e.b].edges.push(e.id);
       vertices[e.a].nbrs.push(e.b);
       vertices[e.b].nbrs.push(e.a);
+      e.land = e.hexes.some((id) => !isSea(id));
+      e.sea = e.hexes.length === 1 || e.hexes.some(isSea);
+    });
+    vertices.forEach((v) => {
+      const land = v.hexes.find((id) => !isSea(id));
+      v.land = land !== undefined;
+      v.island = v.land ? hexes[land].island : null;
+    });
+    return { vertices, edges };
+  }
+
+  // ---------- Plateau « Archipel » ----------
+  // Hexagone de rayon 3. Trois îlots de deux cases sur trois coins alternés, séparés de l'île principale
+  // par la mer ; l'île principale occupe le reste du centre et pousse une presqu'île vers les trois autres coins.
+  // Rotation et symétrie tirées au hasard, puis terrains et jetons mélangés.
+  const SEA_TERRAINS = [
+    ...repeat('forest', 5), ...repeat('pasture', 5), ...repeat('fields', 4), ...repeat('hills', 3), ...repeat('mountains', 4),
+  ];
+  const SEA_TOKENS = [2, 3, 3, 4, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 9, 10, 10, 10, 11, 11, 12];
+
+  function buildSeaBoard(s) {
+    const hexes = makeHexes(3);
+    const hexAt = hexFinder(hexes);
+    const hexNbrs = nbrsIn(hexAt);
+    const rot = rint(s, 6), turn = rint(s, 2) ? 2 : 4;
+    hexes.forEach((h) => { h.island = null; });
+    [0, 2, 4].forEach((k, n) => {
+      const d = HEX_DIRS[(rot + k) % 6], side = HEX_DIRS[(rot + k + turn) % 6];
+      hexAt(3 * d[0], 3 * d[1]).island = n + 1;
+      hexAt(3 * d[0] + side[0], 3 * d[1] + side[1]).island = n + 1;
+    });
+    const nearIslet = (h) => hexNbrs(h).some((o) => o.island > 0);
+    hexes.forEach((h) => {
+      if (h.island !== null || nearIslet(h)) return;
+      const ring = hexDist(h.q, h.r);
+      const peninsula = ring === 3 && h.q * h.r * (h.q + h.r) === 0;
+      if (ring <= 2 || peninsula) h.island = 0;
     });
 
-    // Ports : 9 sur les 30 arêtes côtières, espacés 3-3-4.
+    const land = hexes.filter((h) => h.island !== null);
+    hexes.forEach((h) => { if (h.island === null) h.terrain = 'sea'; });
+    const main = land.filter((h) => h.island === 0);
+    const desert = main[rint(s, main.length)];
+    desert.terrain = 'desert';
+    const fertile = land.filter((h) => h !== desert);
+    for (let tries = 0; tries < 200; tries++) {
+      const terrains = shuffle(s, SEA_TERRAINS.slice());
+      const tokens = shuffle(s, SEA_TOKENS.slice());
+      fertile.forEach((h, i) => { h.terrain = terrains[i]; h.number = tokens[i]; });
+      if (!fertile.some((h) => hot(h) && hexNbrs(h).some((n) => hot(n)))) break;
+    }
+
+    const { vertices, edges } = linkHexes(hexes);
+
+    // Ports : 9 sur la côte de l'île principale, répartis autour du centre, jamais deux sur un même sommet.
     const coast = edges
-      .filter((e) => e.hexes.length === 1)
+      .filter((e) => e.land && e.sea && e.hexes.some((id) => hexes[id].island === 0))
       .map((e) => {
         const A = vertices[e.a], B = vertices[e.b];
         const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
@@ -178,23 +272,24 @@
       })
       .sort((p, q) => p.ang - q.ang);
     const types = shuffle(s, ['any', 'any', 'any', 'any', 'wood', 'brick', 'sheep', 'wheat', 'ore']);
-    const gaps = [0, 3, 6, 10, 13, 16, 20, 23, 26];
-    const ports = gaps.map((g, i) => {
-      const c = coast[g % coast.length];
-      const h = hexes[c.e.hexes[0]];
-      const dx = c.mx - h.x, dy = c.my - h.y;
-      const len = Math.hypot(dx, dy);
-      vertices[c.e.a].port = types[i];
-      vertices[c.e.b].port = types[i];
-      return { edge: c.e.id, a: c.e.a, b: c.e.b, type: types[i], x: c.mx, y: c.my, nx: dx / len, ny: dy / len };
+    const start = rint(s, coast.length);
+    const taken = new Set();
+    const ports = types.map((type, i) => {
+      let k = Math.floor(start + (i * coast.length) / types.length);
+      while (taken.has(coast[k % coast.length].e.a) || taken.has(coast[k % coast.length].e.b)) k++;
+      const c = coast[k % coast.length];
+      taken.add(c.e.a);
+      taken.add(c.e.b);
+      return makePort(hexes, vertices, c, type);
     });
 
-    return { hexes, vertices, edges, ports, spiral };
+    return { hexes, vertices, edges, ports, spiral: [] };
   }
 
-  // Le plateau ne dépend que de la graine : un téléphone le reconstruit sans le recevoir.
-  function boardFromSeed(seed) {
-    return buildBoard({ rng: seed | 0 });
+  // Le plateau ne dépend que de la graine (et de la variante) : un téléphone le reconstruit sans le recevoir.
+  function boardFromSeed(seed, variant) {
+    const s = { rng: seed | 0 };
+    return variant === 'sea' ? buildSeaBoard(s) : buildBoard(s);
   }
 
   // ---------- Création de partie ----------
@@ -202,8 +297,10 @@
     const names = opts.names;
     need(names.length >= 2 && names.length <= 4, 'Entre 2 et 4 joueurs.');
     const seed = (opts.seed == null ? 1 : opts.seed) | 0;
-    const s = { rng: seed, seed };
-    s.board = buildBoard(s);
+    const variant = opts.variant || 'classic';
+    need(VARIANTS.includes(variant), 'Variante inconnue.');
+    const s = { rng: seed, seed, variant };
+    s.board = variant === 'sea' ? buildSeaBoard(s) : buildBoard(s);
     s.players = names.map((name, id) => ({
       id, name, color: null,
       hand: zero(), dev: [], knights: 0,
@@ -215,6 +312,8 @@
     ]);
     s.buildings = {};
     s.roads = {};
+    s.ships = {};
+    s.discover = {};
     s.robber = s.board.hexes.find((h) => h.terrain === 'desert').id;
     const all = names.map((_, i) => i);
     s.order = { groups: [all], pending: all.slice(), rolls: names.map(() => []) };
@@ -234,37 +333,56 @@
     s.largestArmy = { holder: null, size: 0 };
     s.winner = null;
     s.log = [];
-    log(s, 'La partie commence. Chacun choisit sa couleur.');
+    log(s, (variant === 'sea' ? 'La partie commence sur l\'archipel. ' : 'La partie commence. ') + 'Chacun choisit sa couleur.');
     return s;
   }
 
   // ---------- Requêtes de règles ----------
   const buildingsOf = (s, pid, type) => Object.keys(s.buildings).filter((v) => s.buildings[v].owner === pid && (!type || s.buildings[v].type === type)).length;
   const roadsOf = (s, pid) => Object.keys(s.roads).filter((e) => s.roads[e] === pid).length;
+  // Les parties sauvegardées avant la variante marine n'ont ni bateaux ni découvertes.
+  const shipMap = (s) => s.ships || {};
+  const shipsOf = (s, pid) => Object.values(shipMap(s)).filter((o) => o === pid).length;
+  const occupied = (s, e) => s.roads[e] !== undefined || shipMap(s)[e] !== undefined;
+  const isSea = (s) => s.variant === 'sea';
+  const goalOf = (s) => (isSea(s) ? SEA_WIN_POINTS : WIN_POINTS);
+  const discoveriesOf = (s, pid) => Object.values(s.discover || {}).filter((o) => o === pid).length;
 
+  // Mise en place : sur l'archipel, seulement sur l'île principale (les îlots restent à découvrir).
   function legalSettlements(s, pid, free) {
     return s.board.vertices.filter((v) => {
-      if (s.buildings[v.id]) return false;
+      if (v.land === false || s.buildings[v.id]) return false;
       if (v.nbrs.some((n) => s.buildings[n])) return false;
-      return free || v.edges.some((e) => s.roads[e] === pid);
+      if (free) return !isSea(s) || v.island === 0;
+      return v.edges.some((e) => s.roads[e] === pid || shipMap(s)[e] === pid);
     }).map((v) => v.id);
   }
   function legalCities(s, pid) {
     return Object.keys(s.buildings).filter((v) => s.buildings[v].owner === pid && s.buildings[v].type === 'settlement').map(Number);
   }
+  // Une route prolonge une route, un bateau prolonge un bateau ; on passe de l'un à l'autre seulement par une de ses constructions.
+  function extendable(s, pid, e, pieces) {
+    return [e.a, e.b].some((v) => {
+      const b = s.buildings[v];
+      if (b) return b.owner === pid;
+      return s.board.vertices[v].edges.some((x) => x !== e.id && pieces[x] === pid);
+    });
+  }
   function legalRoads(s, pid, fromVertex) {
     return s.board.edges.filter((e) => {
-      if (s.roads[e.id] !== undefined) return false;
+      if (e.land === false || occupied(s, e.id)) return false;
       if (fromVertex != null) return e.a === fromVertex || e.b === fromVertex;
-      return [e.a, e.b].some((v) => {
-        const b = s.buildings[v];
-        if (b) return b.owner === pid;
-        return s.board.vertices[v].edges.some((x) => x !== e.id && s.roads[x] === pid);
-      });
+      return extendable(s, pid, e, s.roads);
     }).map((e) => e.id);
   }
+  function legalShips(s, pid) {
+    if (!isSea(s)) return [];
+    return s.board.edges.filter((e) => e.sea && !occupied(s, e.id) && extendable(s, pid, e, s.ships)).map((e) => e.id);
+  }
+  const canRoad = (s, pid) => roadsOf(s, pid) < LIMITS.road && legalRoads(s, pid).length > 0;
+  const canShip = (s, pid) => shipsOf(s, pid) < LIMITS.ship && legalShips(s, pid).length > 0;
   function legalRobberHexes(s) {
-    return s.board.hexes.filter((h) => h.id !== s.robber).map((h) => h.id);
+    return s.board.hexes.filter((h) => h.id !== s.robber && h.terrain !== 'sea').map((h) => h.id);
   }
 
   function tradeRatios(s, pid) {
@@ -281,30 +399,34 @@
   const devPlayable = (s, p, kind) => p.dev.some((c) => c.k === kind && c.t < s.turnNo);
 
   // Plus longue route d'un joueur : parcours en profondeur, les colonies adverses coupent la chaîne.
+  // Sur l'archipel, routes et bateaux s'enchaînent, mais ne changent de nature que sur une de ses constructions.
   function longestRoadOf(s, pid) {
     const verts = s.board.vertices;
-    const mine = (e) => s.roads[e] === pid;
+    const ships = shipMap(s);
+    const kind = (e) => (s.roads[e] === pid ? 'road' : ships[e] === pid ? 'ship' : null);
+    const own = (v) => s.buildings[v] && s.buildings[v].owner === pid;
     const blocked = (v) => s.buildings[v] && s.buildings[v].owner !== pid;
     const used = new Set();
     const other = (e, v) => (s.board.edges[e].a === v ? s.board.edges[e].b : s.board.edges[e].a);
-    function dfs(v) {
+    function dfs(v, from) {
       let best = 0;
       for (const e of verts[v].edges) {
-        if (!mine(e) || used.has(e)) continue;
+        const k = kind(e);
+        if (!k || used.has(e) || (from && k !== from && !own(v))) continue;
         used.add(e);
         const w = other(e, v);
-        best = Math.max(best, 1 + (blocked(w) ? 0 : dfs(w)));
+        best = Math.max(best, 1 + (blocked(w) ? 0 : dfs(w, k)));
         used.delete(e);
       }
       return best;
     }
     let best = 0;
-    verts.forEach((v) => { if (v.edges.some(mine)) best = Math.max(best, dfs(v.id)); });
+    verts.forEach((v) => { if (v.edges.some(kind)) best = Math.max(best, dfs(v.id, null)); });
     return best;
   }
 
   function points(s, pid, withHidden) {
-    let n = buildingsOf(s, pid, 'settlement') + 2 * buildingsOf(s, pid, 'city');
+    let n = buildingsOf(s, pid, 'settlement') + 2 * buildingsOf(s, pid, 'city') + DISCOVERY_POINTS * discoveriesOf(s, pid);
     if (s.longestRoad.holder === pid) n += 2;
     if (s.largestArmy.holder === pid) n += 2;
     if (withHidden) n += (s.players[pid].dev || []).filter((c) => c.k === 'vp').length;
@@ -397,7 +519,7 @@
 
   function afterAction(s) {
     checkRoadAndArmy(s);
-    if (s.phase === 'main' && points(s, s.turn, true) >= WIN_POINTS) {
+    if (s.phase === 'main' && points(s, s.turn, true) >= goalOf(s)) {
       s.phase = 'ended';
       s.step = 'ended';
       s.winner = s.turn;
@@ -500,7 +622,15 @@
     s.buildings[a.vertex] = { owner: a.player, type: 'settlement' };
     clearTrade(s);
     log(s, p.name + ' construit une colonie.', p.id);
+    discover(s, p, s.board.vertices[a.vertex].island);
   };
+
+  // Premier colon d'un îlot : points de découverte, une seule fois par îlot.
+  function discover(s, p, island) {
+    if (!isSea(s) || !(island > 0) || s.discover[island] !== undefined) return;
+    s.discover[island] = p.id;
+    log(s, p.name + ' découvre un îlot : +' + DISCOVERY_POINTS + ' points.', p.id);
+  }
 
   handlers.placeCity = (s, a) => {
     mainActions(s, a);
@@ -538,23 +668,39 @@
     need(s.phase === 'main', 'Tu ne peux pas faire ça maintenant.');
     need(roadsOf(s, a.player) < LIMITS.road, 'Plus de routes disponibles.');
     need(legalRoads(s, a.player).includes(a.edge), 'Emplacement interdit.');
+    buildOnEdge(s, a, p, 'road');
+  };
+
+  handlers.placeShip = (s, a) => {
+    turnOnly(s, a);
+    need(isSea(s), 'Pas de bateaux dans cette partie.');
+    need(s.phase === 'main', 'Tu ne peux pas faire ça maintenant.');
+    need(shipsOf(s, a.player) < LIMITS.ship, 'Plus de bateaux disponibles.');
+    need(legalShips(s, a.player).includes(a.edge), 'Un bateau se pose en mer, à côté d\'une de tes colonies ou d\'un de tes bateaux.');
+    buildOnEdge(s, a, s.players[a.player], 'ship');
+  };
+
+  // Route ou bateau : gratuit pendant « Construction de routes », payé sinon.
+  function buildOnEdge(s, a, p, kind) {
+    const pieces = kind === 'road' ? s.roads : s.ships;
+    const word = kind === 'road' ? 'une route' : 'un bateau';
     if (s.step === 'roadBuilding') {
-      s.roads[a.edge] = a.player;
+      pieces[a.edge] = a.player;
       s.freeRoads--;
-      log(s, p.name + ' pose une route gratuite.', p.id);
-      if (s.freeRoads <= 0 || roadsOf(s, a.player) >= LIMITS.road || !legalRoads(s, a.player).length) {
+      log(s, p.name + ' pose ' + word + ' gratuit' + (kind === 'road' ? 'e' : '') + '.', p.id);
+      if (s.freeRoads <= 0 || (!canRoad(s, a.player) && !canShip(s, a.player))) {
         s.freeRoads = 0;
         s.step = s.returnStep;
       }
       return;
     }
     need(s.step === 'actions', 'Tu ne peux pas faire ça maintenant.');
-    need(has(p.hand, COST.road), 'Pas assez de ressources.');
-    pay(s, p, COST.road);
-    s.roads[a.edge] = a.player;
+    need(has(p.hand, COST[kind]), 'Pas assez de ressources.');
+    pay(s, p, COST[kind]);
+    pieces[a.edge] = a.player;
     clearTrade(s);
-    log(s, p.name + ' construit une route.', p.id);
-  };
+    log(s, p.name + (kind === 'road' ? ' construit une route.' : ' met un bateau à l\'eau.'), p.id);
+  }
 
   handlers.roll = (s, a) => {
     turnOnly(s, a);
@@ -659,10 +805,11 @@
   };
 
   handlers.playRoadBuilding = (s, a) => {
-    need(roadsOf(s, a.player) < LIMITS.road && legalRoads(s, a.player).length > 0, 'Aucune route possible.');
+    need(canRoad(s, a.player) || canShip(s, a.player), isSea(s) ? 'Aucune route ni aucun bateau possible.' : 'Aucune route possible.');
     const prev = s.step;
     const p = useDev(s, a, 'roadBuilding');
-    s.freeRoads = Math.min(2, LIMITS.road - roadsOf(s, a.player));
+    const left = (LIMITS.road - roadsOf(s, a.player)) + (isSea(s) ? LIMITS.ship - shipsOf(s, a.player) : 0);
+    s.freeRoads = Math.min(2, left);
     s.returnStep = prev;
     s.step = 'roadBuilding';
     log(s, p.name + ' joue Construction de routes.', p.id);
@@ -801,7 +948,9 @@
       setupSettlement: mine && s.phase === 'setup' && s.step === 'settlement',
       setupRoad: mine && s.phase === 'setup' && s.step === 'road',
       freeRoad: mine && s.step === 'roadBuilding',
-      road: acts && afford(COST.road) && roadsOf(s, pid) < LIMITS.road && legalRoads(s, pid).length > 0,
+      freeShip: mine && s.step === 'roadBuilding' && canShip(s, pid),
+      road: acts && afford(COST.road) && canRoad(s, pid),
+      ship: acts && afford(COST.ship) && canShip(s, pid),
       settlement: acts && afford(COST.settlement) && buildingsOf(s, pid, 'settlement') < LIMITS.settlement && legalSettlements(s, pid, false).length > 0,
       city: acts && afford(COST.city) && buildingsOf(s, pid, 'city') < LIMITS.city && legalCities(s, pid).length > 0,
       buyDev: acts && afford(COST.dev) && (s.devDeck ? s.devDeck.length : s.devDeckCount) > 0,
@@ -809,24 +958,29 @@
       ratios: tradeRatios(s, pid),
       dev: {
         knight: canDevNow && devPlayable(s, p, 'knight'),
-        roadBuilding: canDevNow && devPlayable(s, p, 'roadBuilding') && legalRoads(s, pid).length > 0 && roadsOf(s, pid) < LIMITS.road,
+        roadBuilding: canDevNow && devPlayable(s, p, 'roadBuilding') && (canRoad(s, pid) || canShip(s, pid)),
         yearOfPlenty: canDevNow && devPlayable(s, p, 'yearOfPlenty') && total(s.bank) >= 2,
         monopoly: canDevNow && devPlayable(s, p, 'monopoly'),
       },
       respondTrade: !!(s.trade && s.trade.from !== pid && s.phase === 'main'),
     };
-    // Surlignage de plateau selon l'étape.
-    out.targets = { vertices: [], edges: [], hexes: [] };
+    // Surlignage de plateau selon l'étape ; edgeKind dit quelle pièce poser sur les arêtes surlignées.
+    out.targets = { vertices: [], edges: [], hexes: [], edgeKind: 'road' };
     if (out.setupSettlement) out.targets.vertices = legalSettlements(s, pid, true);
     if (out.setupRoad) out.targets.edges = legalRoads(s, pid, s.setup.last);
     if (out.moveRobber) out.targets.hexes = legalRobberHexes(s);
-    if (out.freeRoad) out.targets.edges = legalRoads(s, pid);
+    if (out.freeRoad) {
+      const roads = canRoad(s, pid) ? legalRoads(s, pid) : [];
+      if (roads.length || !out.freeShip) out.targets.edges = roads;
+      else Object.assign(out.targets, { edges: legalShips(s, pid), edgeKind: 'ship' });
+    }
     return out;
   }
 
   // Emplacements pour un mode de construction demandé depuis la main.
   function targetsFor(s, pid, kind) {
-    if (kind === 'road') return { edges: legalRoads(s, pid) };
+    if (kind === 'road') return { edges: legalRoads(s, pid), edgeKind: 'road' };
+    if (kind === 'ship') return { edges: legalShips(s, pid), edgeKind: 'ship' };
     if (kind === 'settlement') return { vertices: legalSettlements(s, pid, false) };
     if (kind === 'city') return { vertices: legalCities(s, pid) };
     return {};
@@ -868,9 +1022,9 @@
   }
 
   return {
-    RES, RES_FR, DEV_FR, TERRAIN_RES, COLORS, COLOR_FR, COST, LIMITS, WIN_POINTS,
+    RES, RES_FR, DEV_FR, TERRAIN_RES, COLORS, COLOR_FR, COST, LIMITS, WIN_POINTS, SEA_WIN_POINTS, DISCOVERY_POINTS, VARIANTS,
     newGame, boardFromSeed, apply, available, targetsFor, actors, viewFor,
-    points, total, longestRoadOf, tradeRatios,
-    legalSettlements, legalCities, legalRoads,
+    points, total, longestRoadOf, tradeRatios, goalOf, discoveriesOf,
+    legalSettlements, legalCities, legalRoads, legalShips,
   };
 });

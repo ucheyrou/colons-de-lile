@@ -80,7 +80,7 @@ Capacités de l'artefact retenues : `room` (messages en direct, une salle par pa
 
 ## 7. Ce qui est volontairement hors périmètre V1
 
-Extensions (Marins, Villes & Chevaliers), plateau personnalisé, parties à plus de 4 joueurs, spectateurs, classements en ligne.
+Extensions officielles (une variante maison « Archipel » avec bateaux existe, voir `RULES.md`), plateau personnalisé, parties à plus de 4 joueurs, spectateurs, classements en ligne.
 
 ## 8. Définition de « terminé » pour chaque fonctionnalité
 

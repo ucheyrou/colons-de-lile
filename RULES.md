@@ -53,6 +53,19 @@ Chacun pose ensuite colonie puis route, dans l'ordre de ce classement, puis en s
 - **Plus longue route** (2 pts) : chaîne continue d'au moins 5 routes. Pour la prendre il faut en avoir strictement plus que le détenteur. Si un joueur la perd par coupure et que plusieurs sont à égalité sans détenteur, personne ne l'a.
 - **Plus grande armée** (2 pts) : au moins 3 chevaliers joués, strictement plus que le détenteur.
 
+## Variante « Archipel » (choisie sur l'écran qui lance la partie)
+Création maison pour jouer sur l'eau ; tout ce qui n'est pas dit ici suit les règles ci-dessus.
+- **Plateau** : hexagone de rayon 3 (37 cases). Trois îlots de deux cases sur trois coins alternés ; l'île principale (16 cases, avec le désert) occupe le centre et pousse une presqu'île vers chacun des trois autres coins ; 15 cases de mer séparent les îles (aucun sommet commun). Rotation et symétrie tirées au hasard. Terrains : 5 forêts, 5 pâturages, 4 champs, 3 collines, 4 montagnes ; jetons 2, 3×2, 4×3, 5×2, 6×2, 8×2, 9×3, 10×3, 11×2, 12, mélangés, jamais deux 6/8 voisins.
+- **Ports** : 9 (mêmes types), répartis sur la côte de l'île principale, jamais deux sur un même sommet.
+- **Mise en place** : sur l'île principale seulement, colonie puis route comme d'habitude.
+- **Bateau** : 1 bois + 1 laine, 15 par joueur. Se pose sur une arête qui touche la mer ou le bord du plateau, reliée à une de ses colonies/villes ou à un de ses bateaux. Une route ne se pose que sur une arête qui touche la terre. Une arête de côte reçoit une route **ou** un bateau, pas les deux. Route et bateau ne se prolongent l'un l'autre qu'à travers une de ses constructions.
+- **Colonie** : reliée à une de ses routes **ou** à un de ses bateaux (règle de distance inchangée).
+- **Découverte** : le premier joueur qui fonde une colonie sur un îlot marque **2 points** (une seule fois par îlot, visibles de tous).
+- **Plus longue route** : routes et bateaux comptent ensemble, avec la même règle de passage par une de ses constructions ; une colonie adverse coupe la chaîne.
+- **Construction de routes** : 2 pièces gratuites, chacune route ou bateau.
+- **Voleur** : seulement sur une case de terre.
+- **Victoire** : **12 points**.
+
 ## Simplifications V1
 - Pas de limite de temps ni de règle de « jeu rapide ».
 - Pas de retour en arrière (annuler).
