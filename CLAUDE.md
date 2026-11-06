@@ -115,6 +115,10 @@ Un agent qui découvre un bug dans le fichier d'un autre le signale (message ou 
 - Tester avec `test/fake-room.mjs` (salon en mémoire) : `node --test test/net.test.mjs`.
 - Capacité à déclarer à la publication : `room` avec `topics: {a: "interact"}`.
 
+## Messages des téléphones
+- Action moteur `chat {text}` (à tout moment, 80 caractères max) : passe par le canal chiffré habituel, s'inscrit au journal et dans `state.chat` (5 derniers, numérotés `n`).
+- L'écran du plateau les montre en bulles 9 s (`trackChat`, `#chatFeed`). Le champ du téléphone (`#chat`) n'est dessiné qu'une fois (`renderChatBox`) pour ne pas perdre la frappe à chaque vue reçue.
+
 ## Variante Archipel
 - Choix du plateau (`ui.variant`) sur l'écran qui lance la partie : écran du plateau (salon) ou partie sur un seul écran. Les téléphones reconstruisent le plateau avec `E.boardFromSeed(seed, variant)`.
 - Règles dans `RULES.md`, tests dans `test/sea.test.mjs`. Les sauvegardes d'avant la variante n'ont ni `variant`, ni `ships`, ni `discover` : le moteur les traite comme une partie classique.

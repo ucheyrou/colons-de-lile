@@ -24,6 +24,7 @@
   const VARIANTS = ['classic', 'sea'];
   const SEA_WIN_POINTS = 12;
   const DISCOVERY_POINTS = 2;
+  const CHAT_MAX = 80;
 
   class RuleError extends Error {}
   const need = (cond, msg) => { if (!cond) throw new RuleError(msg); };
@@ -902,6 +903,16 @@
     s.trade = null;
   };
 
+  // Petit mot d'un joueur pour la table, à tout moment ; on garde les 5 derniers, numérotés pour que l'écran repère les nouveaux.
+  handlers.chat = (s, a) => {
+    const text = typeof a.text === 'string' ? a.text.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim() : '';
+    need(text, 'Message vide.');
+    need(text.length <= CHAT_MAX, 'Message trop long (' + CHAT_MAX + ' caractères au plus).');
+    s.chatCount = (s.chatCount || 0) + 1;
+    s.chat = (s.chat || []).concat({ n: s.chatCount, p: a.player, t: text }).slice(-5);
+    log(s, nameOf(s, a.player) + ' : « ' + text + ' »', a.player);
+  };
+
   handlers.endTurn = (s, a) => {
     mainActions(s, a);
     s.trade = null;
@@ -1022,7 +1033,7 @@
   }
 
   return {
-    RES, RES_FR, DEV_FR, TERRAIN_RES, COLORS, COLOR_FR, COST, LIMITS, WIN_POINTS, SEA_WIN_POINTS, DISCOVERY_POINTS, VARIANTS,
+    RES, RES_FR, DEV_FR, TERRAIN_RES, COLORS, COLOR_FR, COST, LIMITS, WIN_POINTS, SEA_WIN_POINTS, DISCOVERY_POINTS, VARIANTS, CHAT_MAX,
     newGame, boardFromSeed, apply, available, targetsFor, actors, viewFor,
     points, total, longestRoadOf, tradeRatios, goalOf, discoveriesOf,
     legalSettlements, legalCities, legalRoads, legalShips,

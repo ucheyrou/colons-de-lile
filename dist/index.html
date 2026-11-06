@@ -132,6 +132,7 @@ h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
   .stage { position: static; order: 3; }
   .side { display: contents; }
   .hand { order: 1; }
+  .table-chat { order: 1; }
   .scores { order: 2; }
   .log { order: 4; }
 }
@@ -356,6 +357,30 @@ h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
 .log li:last-child { color: var(--ink); font-weight: 600; }
 .log li.by { display: flex; align-items: center; gap: 7px; padding: 3px 8px; border-radius: 6px; color: var(--ink); background: color-mix(in srgb, var(--pc) 18%, transparent); box-shadow: inset 4px 0 0 var(--pc), inset 5px 0 0 rgba(27, 27, 27, .35); }
 .log li.by .dot { width: 10px; height: 10px; border-width: 1.5px; }
+
+/* ---------- Messages des téléphones ----------
+   Sur l'écran du plateau : bulles en bas à gauche, 9 s chacune, recalées par --el. Sur le téléphone : champ sous la main. */
+.chat-feed { position: absolute; left: 14px; bottom: 14px; z-index: 4; display: grid; gap: 8px; justify-items: start; max-width: min(70%, 520px); pointer-events: none; }
+.chat-bubble {
+  display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 18px 18px 18px 4px;
+  background: var(--surface); color: var(--ink); font-size: 19px; line-height: 1.25; box-shadow: var(--shadow), inset 5px 0 0 var(--pc);
+  animation: chat-in .35s cubic-bezier(.3, 1.6, .5, 1) both, chat-out .5s ease-in forwards; animation-delay: var(--el), calc(var(--el) + 8.5s);
+}
+.chat-bubble b { font-family: var(--f-display); white-space: nowrap; }
+.chat-bubble span:last-child { overflow-wrap: anywhere; }
+@keyframes chat-in { from { transform: translateY(16px) scale(.9); opacity: 0; } }
+@keyframes chat-out { to { transform: translateY(-8px); opacity: 0; } }
+.table-chat { display: none; padding: 14px; }
+.layout.client[data-tab="hand"] .table-chat { display: grid; gap: 8px; }
+.chat-row { display: flex; gap: 8px; }
+.chat-row input {
+  flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--ink); font: inherit; font-size: 16px;
+}
+.chat-quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.chat-sent { min-height: 1.2em; margin: 0; color: var(--good); font-size: 13px; font-weight: 700; }
+.chat-quick .btn { min-height: 44px; }
+@media (prefers-reduced-motion: reduce) { .chat-bubble { animation: chat-out .01s forwards; animation-delay: calc(var(--el) + 8.9s); } }
 
 /* ---------- Annonce des constructions, façon écran de bowling ----------
    Chaque délai part de --el (temps déjà écoulé) : un nouveau rendu ne relance rien. */
@@ -778,12 +803,14 @@ body.is-client .top { margin-bottom: 8px; }
         <div class="banner" id="banner"></div>
         <svg id="board" viewBox="-560 -520 1120 1040" role="img" aria-label="Plateau hexagonal"></svg>
         <div id="stage" class="roll-stage" aria-live="polite"></div>
+        <div id="chatFeed" class="chat-feed" aria-live="polite"></div>
         <div id="news" class="news" aria-live="polite"></div>
         <div id="over" hidden></div>
       </div>
     </section>
     <div class="side">
       <section class="card hand" id="hand" aria-label="Main du joueur"></section>
+      <section class="card table-chat" id="chat" aria-label="Message pour l'écran"></section>
       <section class="card scores" id="scores" aria-label="Scores"></section>
       <section class="card log" id="log" aria-label="Journal"></section>
     </div>
@@ -820,6 +847,7 @@ body.is-client .top { margin-bottom: 8px; }
   const VARIANTS = ['classic', 'sea'];
   const SEA_WIN_POINTS = 12;
   const DISCOVERY_POINTS = 2;
+  const CHAT_MAX = 80;
 
   class RuleError extends Error {}
   const need = (cond, msg) => { if (!cond) throw new RuleError(msg); };
@@ -1698,6 +1726,16 @@ body.is-client .top { margin-bottom: 8px; }
     s.trade = null;
   };
 
+  // Petit mot d'un joueur pour la table, à tout moment ; on garde les 5 derniers, numérotés pour que l'écran repère les nouveaux.
+  handlers.chat = (s, a) => {
+    const text = typeof a.text === 'string' ? a.text.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim() : '';
+    need(text, 'Message vide.');
+    need(text.length <= CHAT_MAX, 'Message trop long (' + CHAT_MAX + ' caractères au plus).');
+    s.chatCount = (s.chatCount || 0) + 1;
+    s.chat = (s.chat || []).concat({ n: s.chatCount, p: a.player, t: text }).slice(-5);
+    log(s, nameOf(s, a.player) + ' : « ' + text + ' »', a.player);
+  };
+
   handlers.endTurn = (s, a) => {
     mainActions(s, a);
     s.trade = null;
@@ -1818,7 +1856,7 @@ body.is-client .top { margin-bottom: 8px; }
   }
 
   return {
-    RES, RES_FR, DEV_FR, TERRAIN_RES, COLORS, COLOR_FR, COST, LIMITS, WIN_POINTS, SEA_WIN_POINTS, DISCOVERY_POINTS, VARIANTS,
+    RES, RES_FR, DEV_FR, TERRAIN_RES, COLORS, COLOR_FR, COST, LIMITS, WIN_POINTS, SEA_WIN_POINTS, DISCOVERY_POINTS, VARIANTS, CHAT_MAX,
     newGame, boardFromSeed, apply, available, targetsFor, actors, viewFor,
     points, total, longestRoadOf, tradeRatios, goalOf, discoveriesOf,
     legalSettlements, legalCities, legalRoads, legalShips,
@@ -2452,11 +2490,11 @@ body.is-client .top { margin-bottom: 8px; }
   const ui = {
     screen: 'menu', pin: null, mode: null, tradeOpen: false, tab: 'bank', bankGive: null, bankGet: null,
     give: zero(), want: zero(), discard: zero(), pick: null, yop: [], toast: '', confirmNew: false,
-    count: 3, variant: 'classic', names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: null, diceAt: 0, orderSeen: null, stageTimer: 0, pieces: null, news: [], newsNow: [], newsTimer: 0, lastTurn: -1, fxKey: null, fx: null, fxNow: null, fxTimer: 0, gain: null, gainTimer: 0, lastHand: null,
+    count: 3, variant: 'classic', names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: null, diceAt: 0, orderSeen: null, stageTimer: 0, pieces: null, news: [], newsNow: [], newsTimer: 0, lastTurn: -1, fxKey: null, fx: null, fxNow: null, fxTimer: 0, gain: null, gainTimer: 0, lastHand: null, chatSeen: null, chatShown: [], chatTimer: 0,
     code: '', joinCode: '', myName: '', error: '', busy: false,
     seat: -1, boardSeed: null, board: null, conn: 'searching', lobby: [], pending: 0, phoneTab: 'hand', needBoard: false, wasNeed: false, wasMine: false,
   };
-  let toastTimer = 0;
+  let toastTimer = 0, sentTimer = 0;
 
   // ---------- Stockage local ----------
   const store = {
@@ -2484,6 +2522,7 @@ body.is-client .top { margin-bottom: 8px; }
     return true;
   }
   function afterAction(action) {
+    if (action.type === 'chat') return; // un message ne referme rien de ce que le joueur a ouvert
     ui.mode = null;
     ui.pick = null;
     ui.yop = [];
@@ -2500,7 +2539,7 @@ body.is-client .top { margin-bottom: 8px; }
   }
   // Actions que le téléphone peut montrer tout de suite : elles ne dépendent d'aucun secret (dés, pioche, main des autres).
   // L'hôte tranche ; sa vue remplace de toute façon l'affichage anticipé.
-  const ANTICIPATED = new Set(['pickColor', 'placeSettlement', 'placeRoad', 'placeShip', 'placeCity', 'endTurn', 'bankTrade', 'discard', 'offerTrade', 'cancelTrade', 'respondTrade']);
+  const ANTICIPATED = new Set(['pickColor', 'placeSettlement', 'placeRoad', 'placeShip', 'placeCity', 'endTurn', 'bankTrade', 'discard', 'offerTrade', 'cancelTrade', 'respondTrade', 'chat']);
   function anticipate(action) {
     if (!ANTICIPATED.has(action.type)) return;
     try {
@@ -2674,7 +2713,45 @@ body.is-client .top { margin-bottom: 8px; }
     return [box.x, box.y, box.w, box.h].join(' ');
   }
 
-  function resetFx() { ui.fxKey = null; ui.fx = null; ui.fxNow = null; ui.gain = null; ui.lastHand = null; ui.orderSeen = null; ui.diceKey = null; ui.pieces = null; ui.news = []; }
+  function resetFx() { ui.fxKey = null; ui.fx = null; ui.fxNow = null; ui.gain = null; ui.lastHand = null; ui.orderSeen = null; ui.diceKey = null; ui.pieces = null; ui.news = []; ui.chatSeen = null; ui.chatShown = []; }
+
+  // ---------- Messages des téléphones, en bulles sur l'écran du plateau ----------
+  const CHAT_MS = 9000;
+  const QUICK = ['Bien joué !', 'Qui échange ?', 'Vite !', 'Oups…'];
+  // Repère les messages arrivés depuis le rendu précédent ; une partie reprise ou rejointe ne rejoue pas les anciens.
+  function trackChat() {
+    const list = game.chat || [];
+    const last = list.length ? list[list.length - 1].n : 0;
+    if (ui.chatSeen === null) { ui.chatSeen = last; return; }
+    const t = Date.now();
+    const fresh = list.filter((c) => c.n > ui.chatSeen).map((c) => Object.assign({ at: t }, c));
+    ui.chatSeen = last;
+    ui.chatShown = ui.chatShown.filter((c) => t - c.at < CHAT_MS).concat(fresh).slice(-3);
+    if (fresh.length) { clearTimeout(ui.chatTimer); ui.chatTimer = setTimeout(render, CHAT_MS + 80); }
+  }
+  function renderChatFeed() {
+    const t = Date.now();
+    $('chatFeed').innerHTML = mode === 'client' ? '' : ui.chatShown.filter((c) => t - c.at < CHAT_MS).map((c) =>
+      '<div class="chat-bubble" style="--pc:' + pcolor(c.p) + ';--el:-' + (t - c.at) + 'ms"><span class="dot"></span><b>' + esc(game.players[c.p].name) + '</b><span>' + esc(c.t) + '</span></div>').join('');
+  }
+  // Champ de saisie du téléphone : dessiné une seule fois, pour ne pas perdre la frappe à chaque vue reçue.
+  function renderChatBox() {
+    const box = $('chat');
+    if (!game || mode !== 'client') { box.innerHTML = ''; return; }
+    if (box.firstChild) return;
+    box.innerHTML = '<div class="section-title">Un mot pour l\'écran</div><div class="chat-row">' +
+      '<input id="chatText" type="text" maxlength="' + E.CHAT_MAX + '" autocomplete="off" enterkeyhint="send" placeholder="Ton message…" aria-label="Message affiché sur l\'écran du plateau">' +
+      '<button class="btn primary" data-act="chat-send">Envoyer</button></div><div class="chat-quick">' +
+      QUICK.map((q) => '<button class="btn small" data-act="chat-quick" data-t="' + esc(q) + '">' + esc(q) + '</button>').join('') + '</div>' +
+      '<p class="chat-sent" id="chatSent" role="status"></p>';
+  }
+  function sendChat(text) {
+    if (!text.trim() || !dispatch({ type: 'chat', player: viewer(), text })) return;
+    $('chatText').value = '';
+    $('chatSent').textContent = 'Envoyé à l\'écran ✓';
+    clearTimeout(sentTimer);
+    sentTimer = setTimeout(() => { if ($('chatSent')) $('chatSent').textContent = ''; }, 2500);
+  }
 
   // ---------- Annonce des constructions, façon écran de bowling : on compare les pièces au rendu précédent ----------
   const NEWS_MS = 3200;
@@ -3254,6 +3331,7 @@ body.is-client .top { margin-bottom: 8px; }
     $('welcome').hidden = !!game;
     $('game').hidden = !game;
     document.body.classList.toggle('is-client', !!game && mode === 'client');
+    renderChatBox();
     if (!game) { renderWelcome(); renderNav(); return; }
     const g = $('game');
     g.className = 'layout ' + mode;
@@ -3263,6 +3341,7 @@ body.is-client .top { margin-bottom: 8px; }
     trackBuilds();
     trackDice();
     trackOrder();
+    trackChat();
     ui.fxNow = activeFx();
     ui.newsNow = activeNews();
     $('board').setAttribute('viewBox', viewBoxOf(game.board));
@@ -3286,6 +3365,7 @@ body.is-client .top { margin-bottom: 8px; }
     $('scores').innerHTML = scoresHTML();
     renderLog();
     renderNews();
+    renderChatFeed();
     renderStage();
     const over = $('over');
     over.innerHTML = overHTML();
@@ -3461,6 +3541,8 @@ body.is-client .top { margin-bottom: 8px; }
     resume: () => { const g = store.get(SAVE_KEY); if (validGame(g)) { game = fat(g); mode = 'local'; resetFx(); ui.lastTurn = -1; render(); } },
     variant: (t) => { ui.names.forEach((n, i) => { const el = $('name' + i); if (el) ui.names[i] = el.value; }); ui.variant = t.dataset.k; renderWelcome(); },
     'free-kind': (t) => { ui.mode = t.dataset.k; render(); },
+    'chat-send': () => sendChat($('chatText').value),
+    'chat-quick': (t) => sendChat(t.dataset.t),
     count: (t) => { ui.names.forEach((n, i) => { const el = $('name' + i); if (el) ui.names[i] = el.value; }); ui.count = +t.dataset.n; renderWelcome(); },
     new: () => { ui.confirmNew = true; renderTop(); },
     'new-cancel': () => { ui.confirmNew = false; renderTop(); },
@@ -3549,6 +3631,9 @@ body.is-client .top { margin-bottom: 8px; }
   document.addEventListener('input', (e) => {
     if (e.target.id === 'joinCode') { e.target.value = e.target.value.toUpperCase(); ui.joinCode = e.target.value; }
     else if (e.target.id === 'joinName') ui.myName = e.target.value;
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.target.id === 'chatText' && e.key === 'Enter') { e.preventDefault(); sendChat(e.target.value); }
   });
 
   // ---------- Démarrage ----------

@@ -496,3 +496,21 @@ test('boardFromSeed redonne exactement le plateau de la partie', () => {
   assert.ok(v.log.length <= 5);
   assert.equal(v.devDeckCount, 25);
 });
+
+test('message à la table : à tout moment, nettoyé, borné, les 5 derniers gardés', () => {
+  let s = inActions(finishSetup(fresh(18)));
+  const other = (s.turn + 1) % 3;
+  s = give(s, s.turn, { brick: 1 });
+  s = ok(s, { type: 'offerTrade', player: s.turn, give: { brick: 1 }, want: { ore: 1 } });
+  s = ok(s, { type: 'chat', player: other, text: '  Bien\n  joué\t! ' });
+  assert.deepEqual(s.chat, [{ n: 1, p: other, t: 'Bien joué !' }]);
+  assert.deepEqual(s.log[s.log.length - 1], { t: s.players[other].name + ' : « Bien joué ! »', p: other });
+  assert.equal(s.step, 'actions', 'le tour continue');
+  assert.ok(s.trade, 'l\'offre en cours reste ouverte');
+  assert.match(refused(s, { type: 'chat', player: other, text: '   ' }), /vide/);
+  assert.match(refused(s, { type: 'chat', player: other, text: 'x'.repeat(E.CHAT_MAX + 1) }), /trop long/);
+  refused(s, { type: 'chat', player: other, text: 42 });
+  for (let i = 0; i < 6; i++) s = ok(s, { type: 'chat', player: i % 3, text: 'm' + i });
+  assert.deepEqual(s.chat.map((c) => c.n), [3, 4, 5, 6, 7]);
+  assert.equal(E.viewFor(s, other).chat.length, 5);
+});

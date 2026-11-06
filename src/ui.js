@@ -43,11 +43,11 @@
   const ui = {
     screen: 'menu', pin: null, mode: null, tradeOpen: false, tab: 'bank', bankGive: null, bankGet: null,
     give: zero(), want: zero(), discard: zero(), pick: null, yop: [], toast: '', confirmNew: false,
-    count: 3, variant: 'classic', names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: null, diceAt: 0, orderSeen: null, stageTimer: 0, pieces: null, news: [], newsNow: [], newsTimer: 0, lastTurn: -1, fxKey: null, fx: null, fxNow: null, fxTimer: 0, gain: null, gainTimer: 0, lastHand: null,
+    count: 3, variant: 'classic', names: ['Alice', 'Bruno', 'Chloé', 'David'], diceKey: null, diceAt: 0, orderSeen: null, stageTimer: 0, pieces: null, news: [], newsNow: [], newsTimer: 0, lastTurn: -1, fxKey: null, fx: null, fxNow: null, fxTimer: 0, gain: null, gainTimer: 0, lastHand: null, chatSeen: null, chatShown: [], chatTimer: 0,
     code: '', joinCode: '', myName: '', error: '', busy: false,
     seat: -1, boardSeed: null, board: null, conn: 'searching', lobby: [], pending: 0, phoneTab: 'hand', needBoard: false, wasNeed: false, wasMine: false,
   };
-  let toastTimer = 0;
+  let toastTimer = 0, sentTimer = 0;
 
   // ---------- Stockage local ----------
   const store = {
@@ -75,6 +75,7 @@
     return true;
   }
   function afterAction(action) {
+    if (action.type === 'chat') return; // un message ne referme rien de ce que le joueur a ouvert
     ui.mode = null;
     ui.pick = null;
     ui.yop = [];
@@ -91,7 +92,7 @@
   }
   // Actions que le téléphone peut montrer tout de suite : elles ne dépendent d'aucun secret (dés, pioche, main des autres).
   // L'hôte tranche ; sa vue remplace de toute façon l'affichage anticipé.
-  const ANTICIPATED = new Set(['pickColor', 'placeSettlement', 'placeRoad', 'placeShip', 'placeCity', 'endTurn', 'bankTrade', 'discard', 'offerTrade', 'cancelTrade', 'respondTrade']);
+  const ANTICIPATED = new Set(['pickColor', 'placeSettlement', 'placeRoad', 'placeShip', 'placeCity', 'endTurn', 'bankTrade', 'discard', 'offerTrade', 'cancelTrade', 'respondTrade', 'chat']);
   function anticipate(action) {
     if (!ANTICIPATED.has(action.type)) return;
     try {
@@ -265,7 +266,45 @@
     return [box.x, box.y, box.w, box.h].join(' ');
   }
 
-  function resetFx() { ui.fxKey = null; ui.fx = null; ui.fxNow = null; ui.gain = null; ui.lastHand = null; ui.orderSeen = null; ui.diceKey = null; ui.pieces = null; ui.news = []; }
+  function resetFx() { ui.fxKey = null; ui.fx = null; ui.fxNow = null; ui.gain = null; ui.lastHand = null; ui.orderSeen = null; ui.diceKey = null; ui.pieces = null; ui.news = []; ui.chatSeen = null; ui.chatShown = []; }
+
+  // ---------- Messages des téléphones, en bulles sur l'écran du plateau ----------
+  const CHAT_MS = 9000;
+  const QUICK = ['Bien joué !', 'Qui échange ?', 'Vite !', 'Oups…'];
+  // Repère les messages arrivés depuis le rendu précédent ; une partie reprise ou rejointe ne rejoue pas les anciens.
+  function trackChat() {
+    const list = game.chat || [];
+    const last = list.length ? list[list.length - 1].n : 0;
+    if (ui.chatSeen === null) { ui.chatSeen = last; return; }
+    const t = Date.now();
+    const fresh = list.filter((c) => c.n > ui.chatSeen).map((c) => Object.assign({ at: t }, c));
+    ui.chatSeen = last;
+    ui.chatShown = ui.chatShown.filter((c) => t - c.at < CHAT_MS).concat(fresh).slice(-3);
+    if (fresh.length) { clearTimeout(ui.chatTimer); ui.chatTimer = setTimeout(render, CHAT_MS + 80); }
+  }
+  function renderChatFeed() {
+    const t = Date.now();
+    $('chatFeed').innerHTML = mode === 'client' ? '' : ui.chatShown.filter((c) => t - c.at < CHAT_MS).map((c) =>
+      '<div class="chat-bubble" style="--pc:' + pcolor(c.p) + ';--el:-' + (t - c.at) + 'ms"><span class="dot"></span><b>' + esc(game.players[c.p].name) + '</b><span>' + esc(c.t) + '</span></div>').join('');
+  }
+  // Champ de saisie du téléphone : dessiné une seule fois, pour ne pas perdre la frappe à chaque vue reçue.
+  function renderChatBox() {
+    const box = $('chat');
+    if (!game || mode !== 'client') { box.innerHTML = ''; return; }
+    if (box.firstChild) return;
+    box.innerHTML = '<div class="section-title">Un mot pour l\'écran</div><div class="chat-row">' +
+      '<input id="chatText" type="text" maxlength="' + E.CHAT_MAX + '" autocomplete="off" enterkeyhint="send" placeholder="Ton message…" aria-label="Message affiché sur l\'écran du plateau">' +
+      '<button class="btn primary" data-act="chat-send">Envoyer</button></div><div class="chat-quick">' +
+      QUICK.map((q) => '<button class="btn small" data-act="chat-quick" data-t="' + esc(q) + '">' + esc(q) + '</button>').join('') + '</div>' +
+      '<p class="chat-sent" id="chatSent" role="status"></p>';
+  }
+  function sendChat(text) {
+    if (!text.trim() || !dispatch({ type: 'chat', player: viewer(), text })) return;
+    $('chatText').value = '';
+    $('chatSent').textContent = 'Envoyé à l\'écran ✓';
+    clearTimeout(sentTimer);
+    sentTimer = setTimeout(() => { if ($('chatSent')) $('chatSent').textContent = ''; }, 2500);
+  }
 
   // ---------- Annonce des constructions, façon écran de bowling : on compare les pièces au rendu précédent ----------
   const NEWS_MS = 3200;
@@ -845,6 +884,7 @@
     $('welcome').hidden = !!game;
     $('game').hidden = !game;
     document.body.classList.toggle('is-client', !!game && mode === 'client');
+    renderChatBox();
     if (!game) { renderWelcome(); renderNav(); return; }
     const g = $('game');
     g.className = 'layout ' + mode;
@@ -854,6 +894,7 @@
     trackBuilds();
     trackDice();
     trackOrder();
+    trackChat();
     ui.fxNow = activeFx();
     ui.newsNow = activeNews();
     $('board').setAttribute('viewBox', viewBoxOf(game.board));
@@ -877,6 +918,7 @@
     $('scores').innerHTML = scoresHTML();
     renderLog();
     renderNews();
+    renderChatFeed();
     renderStage();
     const over = $('over');
     over.innerHTML = overHTML();
@@ -1052,6 +1094,8 @@
     resume: () => { const g = store.get(SAVE_KEY); if (validGame(g)) { game = fat(g); mode = 'local'; resetFx(); ui.lastTurn = -1; render(); } },
     variant: (t) => { ui.names.forEach((n, i) => { const el = $('name' + i); if (el) ui.names[i] = el.value; }); ui.variant = t.dataset.k; renderWelcome(); },
     'free-kind': (t) => { ui.mode = t.dataset.k; render(); },
+    'chat-send': () => sendChat($('chatText').value),
+    'chat-quick': (t) => sendChat(t.dataset.t),
     count: (t) => { ui.names.forEach((n, i) => { const el = $('name' + i); if (el) ui.names[i] = el.value; }); ui.count = +t.dataset.n; renderWelcome(); },
     new: () => { ui.confirmNew = true; renderTop(); },
     'new-cancel': () => { ui.confirmNew = false; renderTop(); },
@@ -1140,6 +1184,9 @@
   document.addEventListener('input', (e) => {
     if (e.target.id === 'joinCode') { e.target.value = e.target.value.toUpperCase(); ui.joinCode = e.target.value; }
     else if (e.target.id === 'joinName') ui.myName = e.target.value;
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.target.id === 'chatText' && e.key === 'Enter') { e.preventDefault(); sendChat(e.target.value); }
   });
 
   // ---------- Démarrage ----------

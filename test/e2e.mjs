@@ -68,6 +68,16 @@ if (atSea && phones.some((p) => p.qa('#board .sea-hex').length !== 15)) throw ne
 console.log('partie lancée. joueurs hôte :', host.qa('#scores .pl b').map((e) => e.textContent).join(', '));
 console.log('main cachée sur l\'écran hôte :', host.q('.layout').classList.contains('host'));
 
+// Un téléphone envoie un mot : il s'affiche en bulle sur l'écran, sans champ de saisie côté hôte.
+phones[1].q('#chatText').value = 'Salut la <table> !';
+phones[1].click(phones[1].q('[data-act=chat-send]'));
+await until(() => host.q('.chat-bubble'), 5000, 'bulle de message sur l\'écran');
+const bubble = host.q('.chat-bubble').textContent;
+if (bubble !== 'BrunoSalut la <table> !' || host.q('#chat').innerHTML || phones[1].q('#chatText').value) throw new Error('message mal affiché : ' + bubble);
+phones[2].click(phones[2].q('[data-act=chat-quick]'));
+await until(() => host.qa('.chat-bubble').length === 2, 5000, 'message rapide');
+console.log('messages sur l\'écran :', host.qa('.chat-bubble').map((b) => b.textContent).join(' | '));
+
 // Confidentialité : le DOM d'un téléphone ne montre que sa propre main
 const tiles = (p) => p.qa('#hand .tile b').map((e) => e.textContent).join(',');
 

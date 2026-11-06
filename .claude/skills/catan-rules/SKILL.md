@@ -17,7 +17,7 @@ description: Règles de référence du jeu « Au temps béni des colonies » (je
 - `ended`: `state.winner` renseigné.
 
 ## Actions (champ `player` obligatoire)
-`pickColor{color}`, `rollOrder`, `roll`, `discard{cards}`, `moveRobber{hex}`, `steal{victim}`, `placeSettlement{vertex}`, `placeCity{vertex}`, `placeRoad{edge}`, `placeShip{edge}` (Archipel), `buyDev`, `playKnight`, `playRoadBuilding`, `playYearOfPlenty{a,b}`, `playMonopoly{res}`, `bankTrade{give,get}`, `offerTrade{give,want}`, `respondTrade{accept}`, `confirmTrade{with}`, `cancelTrade`, `endTurn`.
+`pickColor{color}`, `rollOrder`, `roll`, `discard{cards}`, `moveRobber{hex}`, `steal{victim}`, `placeSettlement{vertex}`, `placeCity{vertex}`, `placeRoad{edge}`, `placeShip{edge}` (Archipel), `chat{text}` (à tout moment, ≤ `CHAT_MAX` caractères, 5 derniers dans `state.chat`), `buyDev`, `playKnight`, `playRoadBuilding`, `playYearOfPlenty{a,b}`, `playMonopoly{res}`, `bankTrade{give,get}`, `offerTrade{give,want}`, `respondTrade{accept}`, `confirmTrade{with}`, `cancelTrade`, `endTurn`.
 
 ## Variante Archipel (`state.variant === 'sea'`)
 - `newGame({names, seed, variant})`, `boardFromSeed(seed, variant)` ; `state.ships` (arête → joueur), `state.discover` (îlot → joueur).
